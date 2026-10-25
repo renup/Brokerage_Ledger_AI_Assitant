@@ -14,6 +14,24 @@ This is a learning and portfolio project, built phase by phase from a study plan
 - **Takes text, voice, and images.** Typed chat, speech-to-text and text-to-speech, and screenshot understanding with image safety checks.
 - **Is measurable.** Tracing, an evaluation gate, and fallbacks.
 
+## App screens
+
+Mockups for the iPhone app (Phase 8). They show the behaviour the assistant is built to deliver.
+
+| Home | Chat with a cited answer | Voice |
+|------|--------------------------|-------|
+| ![Home screen: greeting, pending withdrawal, suggested questions](docs/images/01-home.png) | ![Chat: IRA transfer answer with source and action buttons](docs/images/02-chat.png) | ![Voice: spoken answer about a pending withdrawal](docs/images/03-voice.png) |
+
+| Screenshot understanding | Refusals |
+|--------------------------|----------|
+| ![Screenshot of a Code 214 transfer error explained in chat](docs/images/04-screenshot.png) | ![Refusals: stock pick, off-topic request, another person's account](docs/images/05-refusals.png) |
+
+- **Home:** shows what is happening on the customer's account right now (for example a pending withdrawal), plus common questions.
+- **Chat:** answers come with a source from the help center and action buttons such as "Start an IRA transfer".
+- **Voice:** the customer speaks, and the answer is read aloud with its source. Tapping interrupts it.
+- **Screenshot:** the customer shares an error screen. The assistant reads the error code and explains it using their account details.
+- **Refusals:** the assistant declines stock picks, off-topic requests, and attempts to reset someone else's password.
+
 ## Architecture
 
 ```
