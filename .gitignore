@@ -1,1 +1,6 @@
+venv/
 .venv/
+.env
+ledger.db
+__pycache__/
+.DS_Store
