@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 
 # Schemas describe the shape of data going in and out of the API.
@@ -70,3 +70,20 @@ class TransferDetail(TransferPublic):
 class RetryResponse(BaseModel):
     id: int
     status: str
+
+# What the caller sends to PATCH /me/profile
+class ProfileUpdate(BaseModel):
+    # Trim leading and trailing spaces, so "  Maya  " is saved as "Maya"
+    model_config = ConfigDict(str_strip_whitespace=True)
+    # Field(...) adds rules. min_length=1 rejects an empty or all-spaces name
+    # (it's trimmed first, then checked). max_length=100 is a sanity limit.
+    # Breaking a rule gives an automatic 422 error.
+    legal_name: str = Field(min_length=1, max_length=100)
+
+
+# What the profile endpoint answers with.
+# We list fields one by one, so password_hash can never be included.
+class ProfilePublic(BaseModel):
+    id: int
+    name: str
+    legal_name: str

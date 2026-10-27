@@ -4,3 +4,4 @@ venv/
 ledger.db
 __pycache__/
 .DS_Store
+.pytest_cache/
