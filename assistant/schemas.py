@@ -1,6 +1,9 @@
+import json
 from datetime import datetime
 from typing import Literal
 from pydantic import BaseModel
+
+from assistant.models import Message
 
 
 # What the caller sends to POST /chat (moved here from main.py)
@@ -20,6 +23,18 @@ class MessageOut(BaseModel):
     # A list of {"title", "url"} items. Empty for now; real sources arrive in Phase 6.
     sources: list[dict]
     ts: datetime
+
+    # Builds the API shape from a database row, so routers don't repeat this mapping
+    @classmethod
+    def from_message(cls, m: Message) -> "MessageOut":
+        return cls(
+            message_id=m.message_id,
+            role=m.role,
+            text=m.text,
+            # Turn the stored JSON text back into a list
+            sources=json.loads(m.sources_json),
+            ts=m.created_at,
+        )
 
 
 # What the caller sends to the feedback endpoint

@@ -66,12 +66,58 @@ The order is deliberate. The assistant needs account data before it can answer q
 
 | Phase | Status |
 |-------|--------|
-| 1. Setup | In progress |
-| 2–12 | Not started |
+| 1. Setup | Done |
+| 2. Fake brokerage (`ledger-core`) | Done |
+| 3. Chat pipe | Done |
+| 4. Real AI model | In progress: tokenizer notebook, local model via Ollama, system prompt and chat history are done; Postgres migration done |
+| 5–12 | Not started |
 
 ## Repository layout
 
-Folders are added as each phase needs them. See the phase list above for what goes where.
+```
+ledger_core/        Fake brokerage API (port 8000): routers/, models, auth, seed.py, migrations/
+assistant/          Chat API (port 8001), layered:
+  routers/            HTTP only: parse the request, call a service, return the response
+  services/           Chat logic and token-budgeted history (no HTTP, no SQL)
+  repositories/       The only place that runs database queries
+  migrations/         Alembic migrations for the assistant's database
+  prompts/system.md   The system prompt
+web/                Gradio chat page (port 7860)
+notebooks/          Learning notebooks (01_tokens.ipynb)
+tests/              pytest suite (runs against real Postgres test databases)
+docker-compose.yml  Local Postgres 17: one server, one database and login per service
+```
+
+Each service owns its own database and login (`ledger_core`, `assistant`). The assistant never reads ledger-core's database; it calls ledger-core's API.
+
+## Running locally
+
+Requirements: [uv](https://docs.astral.sh/uv/), Docker, and [Ollama](https://ollama.com) with `ollama pull qwen2.5:7b-instruct`.
+
+```bash
+# 1. Configure: copy the example, then fill in real values (generate passwords with: openssl rand -hex 16)
+cp .env.example .env
+
+# 2. Install dependencies (uses uv.lock and the Python version in .python-version)
+uv sync
+
+# 3. Start Postgres (creates both databases and logins on first start)
+docker compose up -d
+
+# 4. Create the tables with migrations, then load the demo customers (password for all: demo1234)
+uv run alembic -c ledger_core/alembic.ini upgrade head
+uv run alembic -c assistant/alembic.ini upgrade head
+uv run python -m ledger_core.seed
+
+# 5. Run the services (one terminal each)
+uv run uvicorn ledger_core.main:app --port 8000 --reload
+uv run uvicorn assistant.main:app --port 8001 --reload
+uv run python web/app.py            # chat page at http://localhost:7860
+```
+
+Run the tests with `uv run pytest`. They use the `ledger_core_test` and `assistant_test` databases, so demo data is never touched.
+
+Changing a table: edit the model, run `uv run alembic -c <service>/alembic.ini revision --autogenerate -m "what changed"`, review the generated file, then `upgrade head`.
 
 ## License
 
