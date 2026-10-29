@@ -4,8 +4,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Settings are read from environment variables / the .env file.
 # Field names match env var names case-insensitively (jwt_secret <- JWT_SECRET).
 class Settings(BaseSettings):
-    # Has a default, so it's optional in .env
-    database_url: str = "sqlite:///ledger.db"
+    # No default = required. Postgres URL, e.g. postgresql+psycopg://user:password@host:5432/dbname.
+    # Failing at startup is better than silently using the wrong database.
+    database_url: str
     # No default = required. The app refuses to start without it.
     jwt_secret: str
     # HS256 = sign tokens with one shared secret

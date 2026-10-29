@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from sqlmodel import SQLModel, Session
+from sqlalchemy import text
+from sqlmodel import Session
 
 from ledger_core.database import engine
 from ledger_core.models import Customer, Account, LinkedBank, Transfer, Withdrawal
@@ -15,9 +16,15 @@ def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 def reset_database():
-    # Delete every table and all its data, then rebuild them empty
-    SQLModel.metadata.drop_all(engine)
-    SQLModel.metadata.create_all(engine)
+    # Empty every table but keep the tables themselves: Alembic migrations own the schema
+    # (run "alembic upgrade head" first). TRUNCATE is Postgres's fast "delete all rows";
+    # RESTART IDENTITY makes ids start at 1 again, and CASCADE covers the foreign keys.
+    # Name ledger-core's own tables explicitly. SQLModel.metadata holds every table imported
+    # in the process (in tests that includes the assistant's), and this database doesn't have those.
+    names = ", ".join(model.__tablename__ for model in (Customer, Account, LinkedBank, Transfer, Withdrawal))
+    with Session(engine) as session:
+        session.exec(text(f"TRUNCATE {names} RESTART IDENTITY CASCADE"))
+        session.commit()
 
 def seed():
     reset_database()

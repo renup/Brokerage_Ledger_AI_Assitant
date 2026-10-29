@@ -4,10 +4,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     # Where to find ledger-core. Can be overridden with LEDGER_CORE_URL in .env.
     ledger_core_url: str = "http://localhost:8000"
-    # The assistant's own database file. Named differently from ledger-core's
-    # DATABASE_URL on purpose, because both services read the same .env file
+    # The assistant's own Postgres database (required, no default). Named differently from
+    # ledger-core's DATABASE_URL on purpose, because both services read the same .env file
     # and would otherwise pick up each other's setting.
-    assistant_database_url: str = "sqlite:///assistant.db"
+    assistant_database_url: str
     # A secret mixed into the customer-id hash (see auth.py). Change it for real use.
     customer_hash_secret: str = "dev-only-secret-change-me"
 

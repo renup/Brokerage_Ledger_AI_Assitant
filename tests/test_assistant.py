@@ -2,7 +2,8 @@ import json
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import SQLModel
+from sqlalchemy import text
+from sqlmodel import Session
 
 from assistant.auth import get_current_user
 from assistant.database import engine
@@ -18,8 +19,9 @@ RENU = {"id": 2, "name": "Renu Punjabi", "email": "renu.punjabi@example.com"}
 # Every test starts with an empty assistant database
 @pytest.fixture(autouse=True)
 def empty_assistant_db():
-    SQLModel.metadata.drop_all(engine)
-    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        session.exec(text("TRUNCATE messages"))
+        session.commit()
 
 
 # A fake model: no Ollama needed. It "says" three words.

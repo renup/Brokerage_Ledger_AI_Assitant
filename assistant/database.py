@@ -1,19 +1,15 @@
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, create_engine
 
 from assistant.config import settings
 
-# The engine is the shared connection pool to the assistant's database. One per process.
-engine = create_engine(
-    settings.assistant_database_url,
-    # SQLite normally insists one thread uses a connection. FastAPI may use a session
-    # from different threads, so we relax that check. (It's a dict: key, colon, value.)
-    connect_args={"check_same_thread": False},
-)
+# The engine is the shared pool of database connections, one per process.
+# pool_pre_ping=True tests a pooled connection with a tiny query before using it, so a
+# connection that Postgres closed (restart, idle timeout) is replaced instead of causing an error.
+engine = create_engine(settings.assistant_database_url, pool_pre_ping=True)
 
 
-def create_db_and_tables():
-    # Creates the messages table if it doesn't exist yet
-    SQLModel.metadata.create_all(engine)
+# The tables are created and changed by Alembic migrations (assistant/migrations),
+# never by the app at startup.
 
 
 # Opens a new database session. This is the "session factory": code that outlives a
