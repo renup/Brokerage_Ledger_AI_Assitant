@@ -13,8 +13,10 @@ class Settings(BaseSettings):
     # "60" in .env is converted from text to a number automatically
     token_expire_minutes: int = 60
 
-    # Where to find the .env file (relative to where you run the command)
-    model_config = SettingsConfigDict(env_file=".env")
+    # Where to find the .env file (relative to where you run the command).
+    # extra="ignore": the shared .env also holds the assistant's and Postgres's settings
+    # (LLM_*, *_DB_PASSWORD). Without this, pydantic would reject them as unknown fields.
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 # One shared settings object that the rest of the app imports

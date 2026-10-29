@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      # The admin login. Used only to create the per-service roles; the apps never use it.
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
+      # Passed through so the init script can create each service's login
+      LEDGER_CORE_DB_PASSWORD: ${LEDGER_CORE_DB_PASSWORD}
+      ASSISTANT_DB_PASSWORD: ${ASSISTANT_DB_PASSWORD}
+    ports:
+      # 127.0.0.1 = reachable from this Mac only, not from work
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # Named volume: the data survives container restarts and "docker compose down"
+      - pgdata:/var/lib/postgresql/data
+      # Scripts in this folder run once, the first time the (empty) database starts
+      - ./docker/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Reports "healthy" only when Postgres actually accep
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
