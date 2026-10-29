@@ -1,6 +1,7 @@
 import json
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
@@ -11,6 +12,7 @@ from assistant.database import create_db_and_tables, engine, get_session
 from assistant.models import Message
 from assistant.schemas import ChatRequest, MessageOut, FeedbackRequest, FeedbackResponse
 from assistant.llm import stream_chat
+from assistant.history import load_history
 
 
 # "lifespan" runs code once when the server starts (before "yield") and once when it stops.
@@ -20,7 +22,7 @@ async def lifespan(app: FastAPI):
     create_db_and_tables()
     yield
 
-
+SYSTEM_PROMPT = (Path(__file__).parent / "prompts" / "system.md").read_text()
 app = FastAPI(title="assistant", lifespan=lifespan)
 
 
@@ -39,13 +41,10 @@ async def reply_stream(first_name: str, session_id: str, owner: str):
     # We read it back from the database, because we saved it before streaming began.
     # We open our OWN session here, because the request's session may already be closed.
     with Session(engine) as session:
-        last_user = session.exec(
-            select(Message)
-            .where(Message.session_id == session_id, Message.role == "user")
-            .order_by(Message.created_at.desc())
-        ).first()
-    messages = [{"role": "user", "content": last_user.text}]
-
+        history = load_history(session, session_id, owner)
+        messages = [
+                {"role": "system", "content": SYSTEM_PROMPT.replace("{first_name}", first_name)}
+            ] + history
     parts = []
     try:
         async for piece in stream_chat(messages):

@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     # Hard cap on how many tokens one reply may use. This is where 4.1 pays off:
     # 512 tokens is roughly 380 English words.
     llm_max_tokens: int = 512
+
+    # The Hugging Face name of the model's tokenizer. Ollama's name ("qwen2.5:7b-instruct")
+    # is not a Hugging Face repo, so we need this separately for counting tokens.
+    llm_tokenizer: str = "Qwen/Qwen2.5-7B-Instruct"
+    # Most history tokens we replay to the model on one turn. Older messages are left out.
+    history_token_budget: int = 6000
     
     # extra="ignore": the shared .env also holds ledger-core's settings (JWT_SECRET etc.).
     # Without this, pydantic would reject them as unknown fields.
