@@ -7,6 +7,8 @@ import tempfile
 os.environ["DATABASE_URL"] = f"sqlite:///{tempfile.mkdtemp()}/test_ledger.db"
 # A fixed secret so the tests don't depend on your .env file
 os.environ["JWT_SECRET"] = "test-secret-not-for-real-use-0123456789"
+# Same idea for the assistant service: its own throwaway database, never your real assistant.db
+os.environ["ASSISTANT_DATABASE_URL"] = f"sqlite:///{tempfile.mkdtemp()}/test_assistant.db"
 
 import pytest
 from fastapi.testclient import TestClient
