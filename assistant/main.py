@@ -1,4 +1,3 @@
-import asyncio
 import json
 import uuid
 from contextlib import asynccontextmanager
@@ -11,10 +10,7 @@ from assistant.auth import customer_hash, get_current_user
 from assistant.database import create_db_and_tables, engine, get_session
 from assistant.models import Message
 from assistant.schemas import ChatRequest, MessageOut, FeedbackRequest, FeedbackResponse
-
-# The fixed reply for now. The greeting with the customer's name goes in front of it.
-# In Phase 4, a real AI model replaces this.
-CANNED_REPLY = "I am Ask Ledger. I cannot look at your account yet, but I am learning"
+from assistant.llm import stream_chat
 
 
 # "lifespan" runs code once when the server starts (before "yield") and once when it stops.
@@ -35,19 +31,32 @@ def sse(event: str, data: dict) -> str:
 
 # Streams the reply word by word, then saves it. "async def" because of "await" below.
 async def reply_stream(first_name: str, session_id: str, owner: str):
-    reply = f"Hi {first_name}! {CANNED_REPLY}"
     # Ids for this reply, sent to the client in the final "done" message
     message_id = str(uuid.uuid4())
     trace_id = str(uuid.uuid4())
 
-    for word in reply.split():
-        # Add the space back, because split() removed it
-        yield sse("token", {"text": word + " "})
-        # Pause so the words visibly arrive one at a time
-        await asyncio.sleep(0.2)
+    # For now the model sees only the new question (4.3 adds the system prompt and history).
+    # We read it back from the database, because we saved it before streaming began.
+    # We open our OWN session here, because the request's session may already be closed.
+    with Session(engine) as session:
+        last_user = session.exec(
+            select(Message)
+            .where(Message.session_id == session_id, Message.role == "user")
+            .order_by(Message.created_at.desc())
+        ).first()
+    messages = [{"role": "user", "content": last_user.text}]
 
-    # Save the finished reply. We open our OWN session here, because the request's
-    # session may already be closed by the time the stream finishes.
+    parts = []
+    try:
+        async for piece in stream_chat(messages):
+            parts.append(piece)
+            yield sse("token", {"text": piece})
+    except Exception:
+        # If the model server is down, tell the client with an "error" event instead of crashing the stream
+        yield sse("error", {"message": "The assistant is unavailable right now. Please try again"})
+        return
+    # Join all the pieces into the full reply, so we can save it
+    reply = "".join(parts)
     with Session(engine) as session:
         session.add(
             Message(
@@ -56,7 +65,7 @@ async def reply_stream(first_name: str, session_id: str, owner: str):
                 customer_id_hash=owner,
                 role="assistant",
                 text=reply,
-                trace_id=trace_id,
+                trace_id=trace_id
             )
         )
         session.commit()
