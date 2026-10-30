@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 
@@ -8,12 +9,16 @@ from assistant.tools.base import Tool
 
 logger = logging.getLogger(__name__)
 
+# The most time one tool may take in total before we give up on it
+TOOL_TIMEOUT_SECONDS = 2.0
+
 
 # Looks tools up by name and runs them safely. The agent loop talks only to this class.
 class ToolRegistry:
-    def __init__(self, tools: list[Tool]):
+    def __init__(self, tools: list[Tool], timeout: float = TOOL_TIMEOUT_SECONDS):
         # name -> Tool, for fast lookup when the model asks for one
         self._tools = {tool.name: tool for tool in tools}
+        self._timeout = timeout
 
     # The list sent to the model with every request
     def definitions(self) -> list[dict]:
@@ -24,7 +29,7 @@ class ToolRegistry:
     async def execute(self, client: LedgerClient, name: str, raw_arguments: str) -> str:
         tool = self._tools.get(name)
         if tool is None:
-            return self._error(name, "No such tool. Use only the tools you were given.")
+            return self.error_result(name, "No such tool. Use only the tools you were given.")
 
         # Models sometimes send empty or broken JSON; treat empty as "no arguments"
         try:
@@ -33,23 +38,27 @@ class ToolRegistry:
             args = tool.args_model.model_validate(arguments)
         except json.JSONDecodeError:
             logger.warning("Arguments for %s were not valid JSON: %r", name, raw_arguments)
-            return self._error(name, "The arguments were not valid JSON. Send a JSON object, or {} for no arguments.")
+            return self.error_result(name, "The arguments were not valid JSON. Send a JSON object, or {} for no arguments.")
         except ValidationError as exc:
             logger.warning("Bad arguments for %s: %s", name, exc)
             # Tell the model exactly what was wrong (this is only its own input echoed back),
             # so it can correct itself on the next round instead of giving up.
             problems = "; ".join(f"{'.'.join(map(str, e['loc'])) or 'arguments'}: {e['msg']}" for e in exc.errors())
-            return self._error(name, f"Invalid arguments ({problems}). Call the tool again with only the parameters it defines.")
+            return self.error_result(name, f"Invalid arguments ({problems}). Call the tool again with only the parameters it defines.")
 
         try:
-            result = await tool.run(client, args)
+            # asyncio.timeout cancels the block if the tool takes longer than the limit
+            async with asyncio.timeout(self._timeout):
+                result = await tool.run(client, args)
+        except TimeoutError:
+            return self.error_result(name, "The lookup took too long. Ask the customer to try again soon.")
         except LedgerRejectedError as exc:
             # 404 = not found, or not this customer's (ledger-core deliberately doesn't say which)
             if exc.status_code == 404:
-                return self._error(name, "That record was not found for this customer.")
-            return self._error(name, "The account system declined the request.")
+                return self.error_result(name, "That record was not found for this customer.")
+            return self.error_result(name, "The account system declined the request.")
         except LedgerUnavailableError:
-            return self._error(name, "The account system is not responding right now. Ask the customer to try again soon.")
+            return self.error_result(name, "The account system is not responding right now. Ask the customer to try again soon.")
 
         return self._data(name, result)
 
@@ -66,5 +75,5 @@ class ToolRegistry:
         )
 
     @staticmethod
-    def _error(name: str, message: str) -> str:
+    def error_result(name: str, message: str) -> str:
         return json.dumps({"tool": name, "error": message})

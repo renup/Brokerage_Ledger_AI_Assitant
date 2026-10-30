@@ -1,6 +1,9 @@
 import asyncio
 import json
 
+from assistant.tools.base import Tool
+from assistant.tools.read import NoArgs
+
 from assistant.clients.ledger import LedgerRejectedError, LedgerUnavailableError
 from assistant.tools.read import READ_TOOLS
 from assistant.tools.registry import ToolRegistry
@@ -91,3 +94,13 @@ def test_ledger_core_404_says_not_found_for_this_customer():
 def test_ledger_core_down_gives_a_try_again_message():
     result = run(FakeLedger(error=LedgerUnavailableError("down")), "get_accounts", "{}")
     assert "not responding" in result["error"]
+
+
+def test_a_tool_that_takes_too_long_is_cut_off_with_a_readable_error():
+    async def very_slow(client, args):
+        await asyncio.sleep(5)
+
+    slow = Tool(name="slow", description="never finishes in time", args_model=NoArgs, run=very_slow)
+    quick_timeout = ToolRegistry([slow], timeout=0.05)
+    result = json.loads(asyncio.run(quick_timeout.execute(FakeLedger(), "slow", "{}")))
+    assert "took too long" in result["error"]
