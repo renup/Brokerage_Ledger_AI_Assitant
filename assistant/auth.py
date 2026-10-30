@@ -26,17 +26,20 @@ def customer_hash(customer_id: int) -> str:
         # hexdigest() turns the result into readable text. The () is needed to call it.
     ).hexdigest()
 
+# Pulls the raw token out of the "Authorization: Bearer <token>" header.
+# A separate dependency because two things need the token: get_current_user (to ask who it
+# belongs to) and the LedgerClient (to make calls as that person).
+def get_bearer_token(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> str:
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Missing token")
+    return credentials.credentials
 
 # A dependency, like get_current_customer in ledger-core. But this service has no
 # customer database. It asks ledger-core instead: "who owns this token?"
 # "async def" because it waits for another service's answer.
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-) -> dict:
-    if credentials is None:
-        raise HTTPException(status_code=401, detail="Missing token")
-    token = credentials.credentials
-
+async def get_current_user(token: str = Depends(get_bearer_token)) -> dict:
     # Seen this token in the last 60 seconds? Reuse the answer, skip the network call.
     # time.monotonic() is a clock that only counts forward, so it's safe for timers.
     cached = _cache.get(token)
