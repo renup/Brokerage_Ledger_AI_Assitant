@@ -10,11 +10,14 @@ from starlette.concurrency import run_in_threadpool
 from assistant.config import settings
 from assistant.database import new_session
 from assistant.errors import NotFoundError
-from assistant.llm import stream_chat
 from assistant.models import Message
 from assistant.repositories.messages import MessageRepository
 from assistant.services.history import trim_to_budget
 from assistant.sse import sse
+
+from assistant.clients.ledger import LedgerClient
+from assistant.services.agent import ToolStarted, run_agent
+from assistant.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +29,20 @@ def system_prompt() -> str:
 
 
 # All the chat logic. It knows nothing about HTTP: routers call it, it calls the repository
-# and the model. "repo" is this request's repository; "session_factory" opens a fresh
-# database session for work that outlives the request (saving after a stream ends).
+# and the model. "repo" is this request's repository; "ledger" makes calls to ledger-core as this
+# caller; "registry" is the shared tool menu; "session_factory" opens a fresh database session
+# for work that outlives the request (saving after a stream ends).
 class ChatService:
-    def __init__(self, repo: MessageRepository, session_factory: Callable[[], Session] = new_session):
+    def __init__(
+        self,
+        repo: MessageRepository,
+        ledger: LedgerClient,
+        registry: ToolRegistry,
+        session_factory: Callable[[], Session] = new_session,
+    ):
         self.repo = repo
+        self.ledger = ledger
+        self.registry = registry
         self.session_factory = session_factory
 
     # Step 1 of a chat turn, run during the request: check the session is allowed, save the
@@ -63,9 +75,14 @@ class ChatService:
 
         parts = []
         try:
-            async for piece in stream_chat(messages):
-                parts.append(piece)
-                yield sse("token", {"text": piece})
+            # run_agent reports two kinds of event: words for the customer, and "a tool is running"
+            async for event in run_agent(messages, self.registry, self.ledger):
+                if isinstance(event, ToolStarted):
+                    # Lets the app show "Checking your account…" while the tool works
+                    yield sse("tool", {"name": event.name})
+                else:
+                    parts.append(event.text)
+                    yield sse("token", {"text": event.text})
         except Exception:
             # Log the real cause for us; tell the client only something safe
             logger.exception("Model call failed (trace_id=%s)", trace_id)
