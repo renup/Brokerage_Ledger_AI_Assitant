@@ -31,9 +31,15 @@ class ToolRegistry:
             arguments = json.loads(raw_arguments) if raw_arguments else {}
             # Validation: wrong type, unknown argument (like customer_id) or bad value fails here
             args = tool.args_model.model_validate(arguments)
-        except (json.JSONDecodeError, ValidationError) as exc:
+        except json.JSONDecodeError:
+            logger.warning("Arguments for %s were not valid JSON: %r", name, raw_arguments)
+            return self._error(name, "The arguments were not valid JSON. Send a JSON object, or {} for no arguments.")
+        except ValidationError as exc:
             logger.warning("Bad arguments for %s: %s", name, exc)
-            return self._error(name, "Invalid arguments. Check the tool's parameters and try again.")
+            # Tell the model exactly what was wrong (this is only its own input echoed back),
+            # so it can correct itself on the next round instead of giving up.
+            problems = "; ".join(f"{'.'.join(map(str, e['loc'])) or 'arguments'}: {e['msg']}" for e in exc.errors())
+            return self._error(name, f"Invalid arguments ({problems}). Call the tool again with only the parameters it defines.")
 
         try:
             result = await tool.run(client, args)

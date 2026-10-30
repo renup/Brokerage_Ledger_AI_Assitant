@@ -69,10 +69,3 @@ async def stream_turn(messages: list[dict], tools: list[dict] | None = None) -> 
                     function = call["function"]
                     yield ToolCall(id=call["id"], name=function["name"], arguments=function["arguments"])
 
-
-# Words only, for callers that never use tools. A thin wrapper so the HTTP code above exists once.
-# (Step 4b switches ChatService to the agent loop, and then this can be deleted.)
-async def stream_chat(messages: list[dict]) -> AsyncIterator[str]:
-    async for item in stream_turn(messages):
-        if isinstance(item, str):
-            yield item

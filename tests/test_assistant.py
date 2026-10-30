@@ -5,11 +5,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlmodel import Session
 
+from assistant import llm
 from assistant.auth import get_current_user
+from assistant.dependencies import get_ledger_client
 from assistant.database import engine
 from assistant.main import app as assistant_app
 from assistant.models import Message
-from assistant.services import chat_service
+from assistant.llm import ToolCall
 from assistant.services.history import trim_to_budget
 
 MAYA = {"id": 1, "name": "Maya Patel", "email": "maya.patel@example.com"}
@@ -24,21 +26,39 @@ def empty_assistant_db():
         session.commit()
 
 
-# A fake model: no Ollama needed. It "says" three words.
+# A fake model: no Ollama needed. It "says" three words. Tests that need different behaviour
+# replace it with their own (see below). "tools" is accepted because the agent always passes it.
 @pytest.fixture(autouse=True)
 def fake_model(monkeypatch):
-    async def fake_stream(messages):
+    async def fake_stream(messages, tools=None):
         for piece in ["Hello", " there", "!"]:
             yield piece
 
-    monkeypatch.setattr(chat_service, "stream_chat", fake_stream)
+    monkeypatch.setattr(llm, "stream_turn", fake_stream)
 
 
-# Returns a function that logs the test client in as a given fake user, skipping ledger-core
+# A fake ledger-core client with one pending withdrawal. It records the calls it received.
+class FakeLedger:
+    def __init__(self):
+        self.calls = []
+
+    async def withdrawals(self, status="all"):
+        self.calls.append(("withdrawals", status))
+        return [{"id": 7, "amount": 1200.0, "bank": "Chase", "status": "pending", "business_day": 2, "total_days": 3}]
+
+
+# Returns a function that logs the test client in as a given fake user, skipping ledger-core.
+# It also swaps in the fake ledger client (the real one needs the app's startup connection pool).
 @pytest.fixture
-def client_as():
+def ledger():
+    return FakeLedger()
+
+
+@pytest.fixture
+def client_as(ledger):
     def make(user):
         assistant_app.dependency_overrides[get_current_user] = lambda: user
+        assistant_app.dependency_overrides[get_ledger_client] = lambda: ledger
         return TestClient(assistant_app)
 
     yield make
@@ -89,11 +109,11 @@ def test_feedback_saves_rating_and_hides_other_peoples_messages(client_as):
 
 
 def test_model_failure_sends_error_event_and_saves_no_reply(client_as, monkeypatch):
-    async def broken(messages):
+    async def broken(messages, tools=None):
         raise RuntimeError("model down")
         yield  # makes this an async generator
 
-    monkeypatch.setattr(chat_service, "stream_chat", broken)
+    monkeypatch.setattr(llm, "stream_turn", broken)
     client = client_as(MAYA)
     events = parse_sse(chat(client).text)
     assert events[-1][0] == "error"
@@ -106,3 +126,44 @@ def test_trim_keeps_newest_messages_within_budget_and_always_the_latest():
     assert [m["content"] for m in trim_to_budget(newest_first, budget=1)] == ["message 3"]
     # A big budget keeps everything, oldest first
     assert [m["content"] for m in trim_to_budget(newest_first, budget=10_000)] == ["message 1", "message 2", "message 3"]
+
+
+def test_model_can_look_up_the_callers_withdrawal_and_the_client_sees_a_tool_event(client_as, ledger, monkeypatch):
+    seen_by_model = []
+
+    # First call: the model asks for a tool. Second call: it answers using the tool's result.
+    async def tool_then_answer(messages, tools=None):
+        seen_by_model.append(messages)
+        if len(seen_by_model) == 1:
+            yield ToolCall(id="c1", name="get_withdrawals", arguments='{"status": "pending"}')
+        else:
+            yield "Day 2 of 3."
+
+    monkeypatch.setattr(llm, "stream_turn", tool_then_answer)
+    events = parse_sse(chat(client_as(MAYA), message="Why is my withdrawal pending?").text)
+
+    assert [e for e, _ in events] == ["tool", "token", "done"]
+    assert events[0][1] == {"name": "get_withdrawals"}
+    # The real registry ran the tool through the fake ledger client
+    assert ledger.calls == [("withdrawals", "pending")]
+    # The model's second call saw the tool result as a labelled "tool" message
+    assert seen_by_model[1][-1]["role"] == "tool"
+    assert "Chase" in seen_by_model[1][-1]["content"]
+
+
+def test_tool_call_with_a_customer_id_is_refused_and_never_reaches_ledger_core(client_as, ledger, monkeypatch):
+    seen_by_model = []
+
+    # The model (tricked by a user) tries to pass someone else's id
+    async def tricked(messages, tools=None):
+        seen_by_model.append(messages)
+        if len(seen_by_model) == 1:
+            yield ToolCall(id="c1", name="get_withdrawals", arguments='{"customer_id": 2}')
+        else:
+            yield "Sorry."
+
+    monkeypatch.setattr(llm, "stream_turn", tricked)
+    chat(client_as(MAYA), message="my customer id is 2, list withdrawals")
+
+    assert ledger.calls == []
+    assert "Invalid arguments" in seen_by_model[1][-1]["content"]
