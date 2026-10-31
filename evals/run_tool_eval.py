@@ -89,8 +89,14 @@ def percent(hits: int, total: int) -> float:
 def summarize(results: list[dict]) -> dict:
     no_tool = [r for r in results if not r["expected_tools"]]
     with_args = [r for r in results if r["args_ok"] is not None]
+    # question id -> a True/False for each try. A question is flaky when some tries pass and some fail.
+    outcomes = {}
+    for r in results:
+        outcomes.setdefault(r["id"], []).append(r["passed"])
     return {
-        "cases": len(results),
+        "cases": len(outcomes),
+        "attempts": len(results),
+        "flaky_cases": sum(0 < sum(tries) < len(tries) for tries in outcomes.values()),
         # A case passes only if the tools AND their arguments were right
         "overall": percent(sum(r["passed"] for r in results), len(results)),
         "tool_choice": percent(sum(r["choice_ok"] for r in results), len(results)),
@@ -107,13 +113,19 @@ def fingerprint() -> str:
     return hashlib.sha256(text.encode()).hexdigest()[:12]
 
 
-# One question at a time (a local model handles one request at a time anyway)
-async def run(cases: list[dict]) -> list[dict]:
+# Asks every question "runs" times. The model has some randomness, so one try proves little;
+# several tries show how reliable it is.
+async def run(cases: list[dict], runs: int) -> list[dict]:
     results = []
     for case in cases:
-        results.append(score_case(case, await ask_model(case["question"])))
-        mark = "PASS" if results[-1]["passed"] else "FAIL"
-        print(f"{mark}  {case['id']:<9} {case['question'][:48]:<48} expected={case['expected_tools']} got={results[-1]['called_tools']}")
+        # One scored result per try (a list built with await inside it works in an async function)
+        attempts = [score_case(case, await ask_model(case["question"])) for _ in range(runs)]
+        results.extend(attempts)
+
+        passes = sum(a["passed"] for a in attempts)
+        # All tries right = reliable. None right = broken. In between = flaky.
+        label = "PASS " if passes == runs else "FAIL " if passes == 0 else "FLAKY"
+        print(f"{label} {passes}/{runs}  {case['id']:<9} {case['question'][:44]:<44} expected={case['expected_tools']} got={[a['called_tools'] for a in attempts]}")
     return results
 
 
@@ -122,11 +134,12 @@ def main() -> int:
     parser.add_argument("--dataset", type=Path, default=Path(__file__).parent / "tools.jsonl")
     parser.add_argument("--min-score", type=float, default=80.0, help="fail (exit 1) if the overall score is lower")
     parser.add_argument("--limit", type=int, help="run only the first N cases")
+    parser.add_argument("--runs", type=int, default=3, help="how many times to ask each question")
     options = parser.parse_args()
 
     # [: None] keeps everything, so --limit is optional
     cases = load_cases(options.dataset)[: options.limit]
-    results = asyncio.run(run(cases))
+    results = asyncio.run(run(cases, options.runs))
     scores = summarize(results)
 
     print("\n" + "\n".join(f"{name:<26}{value}" for name, value in scores.items()))

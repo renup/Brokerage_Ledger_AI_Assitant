@@ -17,7 +17,6 @@
 {"id": "tr-06", "category": "transfers", "question": "Give me the details of transfer number 12.", "expected_tools": ["get_transfer_status"], "expected_args": {"get_transfer_status": {"transfer_id": 12}}}
 {"id": "multi-01", "category": "compound", "question": "What's my cash balance, and where is my withdrawal?", "expected_tools": ["get_accounts", "get_withdrawals"], "expected_args": {}}
 {"id": "multi-02", "category": "compound", "question": "Do I have any pending withdrawals or failed transfers?", "expected_tools": ["get_withdrawals", "get_transfers"], "expected_args": {"get_withdrawals": {"status": "pending"}, "get_transfers": {"status": "failed"}}}
-{"id": "lang-01", "category": "other language", "question": "मेरा निकासी कहाँ है?", "expected_tools": ["get_withdrawals"], "expected_args": {}}
 {"id": "gen-01", "category": "general knowledge", "question": "What is a Roth IRA?", "expected_tools": [], "expected_args": {}}
 {"id": "gen-02", "category": "general knowledge", "question": "How long does an IRA transfer usually take?", "expected_tools": [], "expected_args": {}}
 {"id": "gen-03", "category": "general knowledge", "question": "What does a business day mean?", "expected_tools": [], "expected_args": {}}

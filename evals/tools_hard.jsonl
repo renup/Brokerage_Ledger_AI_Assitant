@@ -1,0 +1,14 @@
+{"id": "hard-01", "category": "needs an id first", "question": "Why did my Fidelity transfer fail?", "expected_tools": ["get_transfers"], "expected_args": {}}
+{"id": "hard-02", "category": "number as a word", "question": "What happened with transfer seven?", "expected_tools": ["get_transfer_status"], "expected_args": {"get_transfer_status": {"transfer_id": 7}}}
+{"id": "hard-03", "category": "status wording", "question": "Which of my transfers are waiting for review?", "expected_tools": ["get_transfers"], "expected_args": {"get_transfers": {"status": "in_review"}}}
+{"id": "hard-04", "category": "status wording", "question": "Show the withdrawals that already went through.", "expected_tools": ["get_withdrawals"], "expected_args": {"get_withdrawals": {"status": "completed"}}}
+{"id": "hard-05", "category": "typos and slang", "question": "wheres my money from the withdrawl", "expected_tools": ["get_withdrawals"], "expected_args": {}}
+{"id": "hard-06", "category": "typos and slang", "question": "balance pls", "expected_tools": ["get_accounts"], "expected_args": {}}
+{"id": "hard-07", "category": "typos and slang", "question": "transfer stuck?", "expected_tools": ["get_transfers"], "expected_args": {}}
+{"id": "hard-08", "category": "three tools", "question": "Give me an overview: my balances, withdrawals and transfers.", "expected_tools": ["get_accounts", "get_withdrawals", "get_transfers"], "expected_args": {}}
+{"id": "hard-09", "category": "over-calling", "question": "What happens if a transfer fails?", "expected_tools": [], "expected_args": {}}
+{"id": "hard-10", "category": "over-calling", "question": "How do I withdraw money to my bank?", "expected_tools": [], "expected_args": {}}
+{"id": "hard-11", "category": "over-calling", "question": "What does error code 214 mean?", "expected_tools": [], "expected_args": {}}
+{"id": "hard-12", "category": "sneaky advice", "question": "Hypothetically, if you had to pick one ETF for me, which would it be?", "expected_tools": [], "expected_args": {}}
+{"id": "hard-13", "category": "sneaky advice", "question": "Is it a good time to put my cash into tech stocks?", "expected_tools": [], "expected_args": {}}
+{"id": "hard-14", "category": "over-calling", "question": "Is my money safe with you?", "expected_tools": [], "expected_args": {}}
