@@ -30,3 +30,6 @@
 {"id": "err-01", "category": "error codes", "question": "What does error 215 mean on a transfer?", "expected_tools": ["lookup_error_code"], "expected_args": {"lookup_error_code": {"code": "215"}}}
 {"id": "err-02", "category": "error codes", "question": "Why did my transfer fail and what do I do about it?", "expected_tools": ["get_transfers"], "expected_args": {}}
 {"id": "err-03", "category": "error codes", "question": "Is error code 230 serious?", "expected_tools": ["lookup_error_code"], "expected_args": {"lookup_error_code": {"code": "230"}}}
+{"id": "est-01", "category": "arrival estimate", "question": "If I start a withdrawal today and it takes 3 business days, what date does it land?", "expected_tools": ["estimate_arrival"], "expected_args": {"estimate_arrival": {"business_days": 3}}}
+{"id": "est-02", "category": "arrival estimate", "question": "What's the arrival date for something that takes 2 business days, starting today?", "expected_tools": ["estimate_arrival"], "expected_args": {"estimate_arrival": {"business_days": 2}}}
+{"id": "est-03", "category": "arrival estimate", "question": "How many business days does a withdrawal usually take?", "expected_tools": [], "expected_args": {}}

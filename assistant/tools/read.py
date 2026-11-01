@@ -1,8 +1,10 @@
+from datetime import date
 from typing import Literal
 
 from pydantic import Field
 
 from assistant.clients.ledger import LedgerClient
+from assistant.knowledge.business_days import add_business_days
 from assistant.knowledge.error_codes import explain_error
 from assistant.tools.base import Tool, ToolArgs
 
@@ -32,6 +34,10 @@ class TransfersArgs(ToolArgs):
 
 class ErrorCodeArgs(ToolArgs):
     code: str = Field(description="The error code from a failed transfer, as text, for example '214'.")
+
+class EstimateArrivalArgs(ToolArgs):
+    business_days: int = Field(ge=1, le=10, description="How many business days the money takes, from 1 to 10.")
+    start_date: date | None = Field(default=None, description="The day it starts, as YYYY-MM-DD. Leave out for today.")
 
 class TransferStatusArgs(ToolArgs):
     transfer_id: int = Field(description="The id of one transfer, as returned by get_transfers.")
@@ -64,6 +70,18 @@ async def lookup_error_code(client: LedgerClient, args: ErrorCodeArgs):
         # Say plainly that we have nothing, so the model does not invent an explanation
         return {"found": False, "message": "No explanation is on file for this code. Suggest contacting support."}
     return {"found": True, "title": info.title, "meaning": info.meaning, "what_to_do": info.what_to_do}
+
+# Another tool with no call to ledger-core: the date math is done in code, never by the model
+async def estimate_arrival(client: LedgerClient, args: EstimateArrivalArgs):
+    # No start date means today
+    start = args.start_date or date.today()
+    arrival = add_business_days(start, args.business_days)
+    return {
+        "start_date": start.isoformat(),
+        "arrival_date": arrival.isoformat(),
+        "arrival_weekday": arrival.strftime("%A"),
+        "note": "Counts Monday to Friday only. Market holidays are not included, so it could be one day later.",
+    }
 
 
 # --- The list the registry is built from ---
@@ -107,5 +125,13 @@ READ_TOOLS = [
         "with an error code. The code is shown in the transfer data; never ask the customer for it.",
         args_model=ErrorCodeArgs,
         run=lookup_error_code,
+    ),
+    Tool(
+        name="estimate_arrival",
+        description="Work out the date money would arrive after a number of business days (Monday to Friday). "
+        "Use for 'if I withdraw today, when will it arrive' style questions, never do date math yourself. "
+        "For a withdrawal the customer already made, use get_withdrawals instead.",
+        args_model=EstimateArrivalArgs,
+        run=estimate_arrival,
     ),
 ]
