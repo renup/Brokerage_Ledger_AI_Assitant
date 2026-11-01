@@ -22,4 +22,8 @@ class Message(SQLModel, table=True):
     rating: str | None = None
     # An id for following one request through logs later (Phase 11)
     trace_id: str | None = None
+    # The lookups made to produce this reply, as JSON text: one entry per round, each with the
+    # call id, tool name, arguments, result and time. Replayed to the model on later turns.
+    # server_default fills the column for rows that already exist when the migration runs.
+    tool_trace_json: str = Field(default="[]", sa_column_kwargs={"server_default": "[]"})
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

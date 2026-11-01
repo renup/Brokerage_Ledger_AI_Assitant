@@ -1,6 +1,8 @@
+import json
 import logging
 import uuid
 from collections.abc import AsyncIterator, Callable
+from dataclasses import asdict
 from functools import lru_cache
 from pathlib import Path
 
@@ -16,7 +18,7 @@ from assistant.services.history import trim_to_budget
 from assistant.sse import sse
 
 from assistant.clients.ledger import LedgerClient
-from assistant.services.agent import ToolStarted, run_agent
+from assistant.services.agent import ToolRound, ToolStarted, run_agent
 from assistant.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
@@ -74,12 +76,17 @@ class ChatService:
         trace_id = str(uuid.uuid4())
 
         parts = []
+        # Each round of lookups the agent reports. Saved with the reply so later turns know the real ids.
+        rounds = []
         try:
-            # run_agent reports two kinds of event: words for the customer, and "a tool is running"
+            # run_agent reports three kinds of event: words for the customer, "a tool is running", and a finished round of lookups
             async for event in run_agent(messages, self.registry, self.ledger):
                 if isinstance(event, ToolStarted):
                     # Lets the app show "Checking your account…" while the tool works
                     yield sse("tool", {"name": event.name})
+                elif isinstance(event, ToolRound):
+                    # Not for the customer: kept so we can save it with the reply
+                    rounds.append(event)
                 else:
                     parts.append(event.text)
                     yield sse("token", {"text": event.text})
@@ -96,6 +103,8 @@ class ChatService:
             role="assistant",
             text="".join(parts),
             trace_id=trace_id,
+            # asdict turns the dataclasses into plain dicts that json.dumps can store
+            tool_trace_json=json.dumps([asdict(r) for r in rounds]),
         )
         # Save in a worker thread so the (blocking) database call doesn't freeze other streams
         await run_in_threadpool(self._save_reply, reply)

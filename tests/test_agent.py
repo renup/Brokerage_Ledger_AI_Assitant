@@ -4,7 +4,7 @@ import time
 
 from assistant import llm
 from assistant.llm import ToolCall
-from assistant.services.agent import MAX_TOOL_CALLS, MAX_TOOL_ROUNDS, Token, ToolStarted, run_agent
+from assistant.services.agent import MAX_TOOL_CALLS, MAX_TOOL_ROUNDS, Token, ToolRound, ToolStarted, run_agent
 
 
 # A stand-in for ToolRegistry: records what it was asked to run.
@@ -63,7 +63,12 @@ def test_tool_request_runs_the_tool_then_asks_the_model_again(monkeypatch):
     calls = fake_model(monkeypatch, [[request], ["You have one account."]])
     events = collect(registry)
 
-    assert events == [ToolStarted("get_accounts"), Token("You have one account.")]
+    assert events[0] == ToolStarted("get_accounts")
+    # After the lookups finish, the loop reports what was asked and what came back, so it can be saved
+    assert isinstance(events[1], ToolRound)
+    assert events[1].records[0].id == "c1"
+    assert events[1].records[0].name == "get_accounts"
+    assert events[2] == Token("You have one account.")
     assert registry.executed == [("get_accounts", "{}")]
     # The second model call saw what it asked for AND the tool's result
     second_call_messages = calls[1][0]

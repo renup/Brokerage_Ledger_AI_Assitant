@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 from assistant import llm
 from assistant.clients.ledger import LedgerClient
@@ -23,6 +24,22 @@ class Token:
 class ToolStarted:
     name: str
 
+# One lookup the model asked for, and what came back. Saved so later turns know the real ids and facts.
+@dataclass(frozen=True)
+class ToolRecord:
+    id: str
+    name: str
+    arguments: str
+    result: str
+
+
+# Everything looked up in ONE round, reported once all the results are in.
+# "at" is when, because account data can change after we fetched it.
+@dataclass(frozen=True)
+class ToolRound:
+    records: tuple[ToolRecord, ...]
+    at: str
+
 
 # The model -> tools -> model loop. "messages" is the conversation so far (rules + history).
 #
@@ -34,7 +51,7 @@ class ToolStarted:
 # Each trip through the "for" loop below is one such round.
 async def run_agent(
     messages: list[dict], registry: ToolRegistry, client: LedgerClient
-) -> AsyncIterator[Token | ToolStarted]:
+) -> AsyncIterator[Token | ToolStarted | ToolRound]:
     # Work on a copy, so tool calls and results don't leak into the caller's list
     conversation = list(messages)
     # How many tool calls we have run so far for this one customer message
@@ -85,12 +102,19 @@ async def run_agent(
         # lines up with the request it answers.
         results = await asyncio.gather(*(registry.execute(client, c.name, c.arguments) for c in to_run))
 
-        # Hand each result back to the model, labelled with the id of the request it answers
+        # Hand each result back to the model, labelled with the id of the request it answers.
+        # "records" also remembers each one, so ChatService can save them for later turns.
+        records = []
         for call, result in zip(to_run, results):
             conversation.append({"role": "tool", "tool_call_id": call.id, "content": result})
+            records.append(ToolRecord(call.id, call.name, call.arguments, result))
 
         # The model must get an answer to EVERY request it made, or its next turn is malformed.
         # For requests we refused to run (over the limit), the answer is "too many lookups".
         for call in skipped:
             limit_result = registry.error_result(call.name, "Too many lookups for one question. Answer with what you have.")
             conversation.append({"role": "tool", "tool_call_id": call.id, "content": limit_result})
+            records.append(ToolRecord(call.id, call.name, call.arguments, limit_result))
+
+        # Report the whole round now that every result is in
+        yield ToolRound(tuple(records), datetime.now(timezone.utc).isoformat(timespec="seconds"))
