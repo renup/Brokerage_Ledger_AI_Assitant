@@ -31,15 +31,19 @@ def load_cases(path: Path) -> list[dict]:
 
 
 # Asks the model one question and returns the tools it asked for (an empty list = it answered in words)
-async def ask_model(question: str) -> list[ToolCall]:
+async def ask_model(question: str) -> tuple[list[ToolCall], str]:
     rules = system_prompt().replace("{first_name}", "Maya")
     messages = [{"role": "system", "content": rules}, {"role": "user", "content": question}]
     calls = []
+    words = []
     async for item in stream_turn(messages, REGISTRY.definitions()):
-        # Words are ignored; we only care about the tool requests
+        # Tool requests are what we score; the words are kept as evidence
         if isinstance(item, ToolCall):
             calls.append(item)
-    return calls
+        else:
+            # Keep the words too; they are the evidence when a case fails
+            words.append(item)
+    return calls, "".join(words)
 
 
 # The arguments the model sent, cleaned up by the tool's own Pydantic class. That fills in
@@ -53,7 +57,7 @@ def normalized_args(call: ToolCall) -> dict | None:
 
 
 # Compares what the model did with what we expected, for one question
-def score_case(case: dict, calls: list[ToolCall]) -> dict:
+def score_case(case: dict, calls: list[ToolCall], words: str) -> dict:
     called = {call.name: call for call in calls}
     # Right tools means exactly the expected set: none missing, none extra
     choice_ok = set(called) == set(case["expected_tools"])
@@ -78,6 +82,7 @@ def score_case(case: dict, calls: list[ToolCall]) -> dict:
         "choice_ok": choice_ok,
         "args_ok": args_ok,
         "passed": choice_ok and args_ok is not False,
+        "reply_text": words[:300],  # the model's first 300 characters, to see WHY a case failed
     }
 
 
@@ -113,13 +118,19 @@ def fingerprint() -> str:
     return hashlib.sha256(text.encode()).hexdigest()[:12]
 
 
+# Asks the model one question once and scores what it did
+async def one_try(case: dict) -> dict:
+    calls, words = await ask_model(case["question"])
+    return score_case(case, calls, words)
+
+
 # Asks every question "runs" times. The model has some randomness, so one try proves little;
 # several tries show how reliable it is.
 async def run(cases: list[dict], runs: int) -> list[dict]:
     results = []
     for case in cases:
         # One scored result per try (a list built with await inside it works in an async function)
-        attempts = [score_case(case, await ask_model(case["question"])) for _ in range(runs)]
+        attempts = [await one_try(case) for _ in range(runs)]
         results.extend(attempts)
 
         passes = sum(a["passed"] for a in attempts)

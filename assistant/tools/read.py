@@ -16,13 +16,18 @@ class NoArgs(ToolArgs):
 
 class WithdrawalsArgs(ToolArgs):
     status: Literal["pending", "completed", "failed", "all"] = Field(
-        default="all", description="Which withdrawals to list. Use 'pending' for ones still in progress."
+        default="all", 
+    description="Which withdrawals to list. Use 'all' unless the customer names a status. "
+    "Use 'pending' only when they ask about withdrawals still in progress, "
+    "'completed' for ones that finished, and 'failed' for ones that had a problem."
     )
 
 
 class TransfersArgs(ToolArgs):
     status: Literal["requested", "in_review", "in_progress", "completed", "failed", "all"] = Field(
-        default="all", description="Which transfers to list. Use 'failed' to find transfers that had a problem."
+        default="all", 
+    description="Which transfers to list. Use 'all' unless the customer names a status. "
+    "Use 'failed' to find transfers that had a problem and 'in_progress' for ones still moving."
     )
 
 
@@ -68,15 +73,18 @@ READ_TOOLS = [
     ),
     Tool(
         name="get_transfers",
-        description="List the customer's own account transfers to or from other brokers, with status and any error code. "
-        "Use to find a transfer or see which ones failed. Do not use for general questions about how transfers work.",
+       description="List the customer's own account transfers to or from other brokers, with status and any error code. "
+        "Use for ANY question about the status or progress of one of their transfers, such as "
+        "'what's going on with my IRA transfer' or 'did my Fidelity transfer go through'. "
+        "Do not use for general questions about how transfers work.",
         args_model=TransfersArgs,
         run=get_transfers,
     ),
     Tool(
         name="get_transfer_status",
         description="Get full details of ONE of the customer's own transfers, including the error message if it failed. "
-        "Needs the transfer id, which you can get from get_transfers.",
+        "If the customer gives a transfer number, use it directly. Otherwise call get_transfers first to find the id; "
+        "never ask the customer for an id.",
         args_model=TransferStatusArgs,
         run=get_transfer_status,
     ),
