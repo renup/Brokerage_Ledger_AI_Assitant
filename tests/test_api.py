@@ -92,3 +92,32 @@ def test_update_legal_name(client):
     assert response.json()["legal_name"] == "Maya Rose Patel"
     # A blank name is rejected
     assert client.patch("/me/profile", json={"legal_name": "   "}, headers=headers).status_code == 422
+
+def test_maya_sees_fees_for_her_account_types_only(client):
+    fees = client.get("/me/fees", headers=login_headers(client, MAYA)).json()
+    # Maya holds an individual and a Roth IRA: the shared fees plus the Roth one, never the traditional IRA row
+    assert {f["applies_to"] for f in fees} == {"all", "roth_ira"}
+    assert any(f["name"] == "Outgoing account transfer" and f["amount"] == 75.0 for f in fees)
+
+
+def test_individual_only_customer_sees_no_ira_fee(client):
+    fees = client.get("/me/fees", headers=login_headers(client, RENU)).json()
+    assert {f["applies_to"] for f in fees} == {"all"}
+
+
+def test_maya_sees_only_her_tax_documents(client):
+    documents = client.get("/me/tax-documents", headers=login_headers(client, MAYA)).json()
+    assert len(documents) == 4
+    assert {d["number_last4"] for d in documents} == {"4821", "7730"}
+
+
+def test_tax_documents_can_be_filtered_by_year(client):
+    documents = client.get("/me/tax-documents?year=2026", headers=login_headers(client, MAYA)).json()
+    assert len(documents) == 1
+    # A form that is not issued yet has no download link
+    assert documents[0]["status"] == "pending" and documents[0]["download_path"] is None
+
+
+def test_fees_and_tax_documents_need_a_token(client):
+    assert client.get("/me/fees").status_code == 401
+    assert client.get("/me/tax-documents").status_code == 401

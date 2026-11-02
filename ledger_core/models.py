@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 
 from sqlmodel import SQLModel, Field
 
@@ -86,3 +86,37 @@ class Transfer(SQLModel, table=True):
     error_message: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     expected_by: datetime
+
+
+# One row of the price list. No customer owns a row: the same list applies to everyone,
+# and the API shows each customer only the rows for the account types they hold.
+class FeeSchedule(SQLModel, table=True):
+    __tablename__ = "fee_schedule"
+
+    id: int | None = Field(default=None, primary_key=True)
+    # individual, roth_ira or traditional_ira, or "all" for fees every account pays
+    account_type: str
+    name: str
+    # Whole cents, like every amount in this database. 0 means free.
+    amount_cents: int
+    # When it is charged: per_trade, per_transfer_out, per_withdrawal, monthly or annual
+    frequency: str
+    description: str
+
+
+# A tax form for one account, e.g. a 1099-B for Maya's individual account
+class TaxDocument(SQLModel, table=True):
+    __tablename__ = "tax_documents"
+
+    id: int | None = Field(default=None, primary_key=True)
+    # Owned through the account, like withdrawals and transfers
+    account_id: int = Field(foreign_key="accounts.id")
+    # The IRS form: 1099-B, 1099-DIV or 5498
+    form: str
+    tax_year: int
+    # available, pending or corrected
+    status: str
+    # The day it is (or will be) ready to download
+    available_on: date
+    # Where the customer downloads it in the app. None until it is available.
+    download_path: str | None = None

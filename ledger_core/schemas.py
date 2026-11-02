@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field
-from datetime import datetime
+from datetime import datetime, date
 
 # Schemas describe the shape of data going in and out of the API.
 # They are not database tables (that's models.py).
@@ -87,3 +87,24 @@ class ProfilePublic(BaseModel):
     id: int
     name: str
     legal_name: str
+
+
+# One fee as the caller sees it. Dollars, not cents.
+class FeePublic(BaseModel):
+    name: str
+    amount: float  # dollars; 0 means free
+    frequency: str
+    applies_to: str  # an account type, or "all"
+    description: str
+
+
+# One tax form as the caller sees it, with which account it belongs to
+class TaxDocumentPublic(BaseModel):
+    id: int
+    account_type: str
+    number_last4: str
+    form: str
+    tax_year: int
+    status: str
+    available_on: date
+    download_path: str | None

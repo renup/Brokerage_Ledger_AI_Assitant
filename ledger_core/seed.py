@@ -1,11 +1,11 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import bcrypt
 from sqlalchemy import text
 from sqlmodel import Session
 
 from ledger_core.database import engine
-from ledger_core.models import Customer, Account, LinkedBank, Transfer, Withdrawal
+from ledger_core.models import Account, Customer, FeeSchedule, LinkedBank, TaxDocument, Transfer, Withdrawal
 
 # Every demo customer shares this password, so you can log in as anyone
 DEMO_PASSWORD = "demo1234"
@@ -21,7 +21,7 @@ def reset_database():
     # RESTART IDENTITY makes ids start at 1 again, and CASCADE covers the foreign keys.
     # Name ledger-core's own tables explicitly. SQLModel.metadata holds every table imported
     # in the process (in tests that includes the assistant's), and this database doesn't have those.
-    names = ", ".join(model.__tablename__ for model in (Customer, Account, LinkedBank, Transfer, Withdrawal))
+    names = ", ".join(model.__tablename__ for model in (Customer, Account, LinkedBank, Transfer, Withdrawal, FeeSchedule, TaxDocument))
     with Session(engine) as session:
         session.exec(text(f"TRUNCATE {names} RESTART IDENTITY CASCADE"))
         session.commit()
@@ -65,6 +65,7 @@ def seed():
 
         # add_all queues the rows; nothing is saved until commit()
         session.add_all([maya, renu, raj, david, siya])
+
         # Commit now: accounts below need maya.id etc., which exist only after saving
         session.commit()
 
@@ -151,6 +152,39 @@ def seed():
             created_at=now - timedelta(days=3), expected_by=now + timedelta(days=4),
         )
         session.add_all([maya_transfer, renu_transfer, raj_transfer, siya_transfer, david_transfer])
+
+        # The price list: the same rows for everyone, shown by account type
+        session.add_all([
+            FeeSchedule(account_type="all", name="Stock and ETF trades", amount_cents=0, frequency="per_trade",
+                        description="No commission on online stock and ETF trades."),
+            FeeSchedule(account_type="all", name="Outgoing account transfer", amount_cents=7500, frequency="per_transfer_out",
+                        description="Charged when you move an account to another broker. Incoming transfers are free."),
+            FeeSchedule(account_type="all", name="Outgoing wire withdrawal", amount_cents=2500, frequency="per_withdrawal",
+                        description="Bank wires cost $25. Standard bank transfers (ACH) are free."),
+            FeeSchedule(account_type="all", name="Paper statements", amount_cents=200, frequency="monthly",
+                        description="Free if you choose electronic statements."),
+            FeeSchedule(account_type="roth_ira", name="IRA annual fee", amount_cents=2500, frequency="annual",
+                        description="Waived when the account holds $10,000 or more."),
+            FeeSchedule(account_type="traditional_ira", name="IRA annual fee", amount_cents=2500, frequency="annual",
+                        description="Waived when the account holds $10,000 or more."),
+        ])
+
+        # Tax forms. 2025 forms are ready; the 2026 forms are not issued until early 2027.
+        # download_path is where the app would serve the file (fictional here).
+        def tax_form(account, form, year, status, available_on):
+            path = f"/documents/{year}/{account.number_last4}-{form}.pdf" if status != "pending" else None
+            return TaxDocument(account_id=account.id, form=form, tax_year=year, status=status,
+                               available_on=available_on, download_path=path)
+
+        session.add_all([
+            tax_form(maya_individual, "1099-B", 2025, "available", date(2026, 2, 15)),
+            tax_form(maya_individual, "1099-DIV", 2025, "available", date(2026, 2, 15)),
+            tax_form(maya_roth, "5498", 2025, "available", date(2026, 5, 31)),
+            tax_form(maya_individual, "1099-B", 2026, "pending", date(2027, 2, 15)),
+            tax_form(renu_individual, "1099-B", 2025, "available", date(2026, 2, 15)),
+            tax_form(raj_individual, "1099-B", 2025, "corrected", date(2026, 3, 20)),
+            tax_form(david_ira, "5498", 2025, "available", date(2026, 5, 31)),
+        ])
         # Without this final commit, the withdrawals and transfers would be lost
         session.commit()
 
