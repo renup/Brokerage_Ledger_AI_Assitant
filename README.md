@@ -69,8 +69,9 @@ The order is deliberate. The assistant needs account data before it can answer q
 | 1. Setup | Done |
 | 2. Fake brokerage (`ledger-core`) | Done |
 | 3. Chat pipe | Done |
-| 4. Real AI model | In progress: tokenizer notebook, local model via Ollama, system prompt and chat history are done; Postgres migration done |
-| 5–12 | Not started |
+| 4. Real AI model | Done: tokenizer notebook, local model via Ollama, system prompt, token-budgeted chat history, Postgres |
+| 5. Account answers | In progress: six read-only tools, an agent loop, saved lookups for follow-up questions, and tool-choice evals are done. Still to do: fee and tax-document tools, then the approval flow (5.4) |
+| 6–12 | Not started |
 
 ## Repository layout
 
@@ -78,10 +79,14 @@ The order is deliberate. The assistant needs account data before it can answer q
 ledger_core/        Fake brokerage API (port 8000): routers/, models, auth, seed.py, migrations/
 assistant/          Chat API (port 8001), layered:
   routers/            HTTP only: parse the request, call a service, return the response
-  services/           Chat logic and token-budgeted history (no HTTP, no SQL)
+  services/           Chat logic, the agent loop (agent.py) and token-budgeted history (no HTTP, no SQL)
   repositories/       The only place that runs database queries
+  clients/            Calls to ledger-core, made with the caller's own token
+  tools/              What the model may ask for: argument models, the read tools, and a registry that validates and runs them
+  knowledge/          Facts kept in code: the transfer error-code catalog and business-day date math
   migrations/         Alembic migrations for the assistant's database
   prompts/system.md   The system prompt
+evals/              Tool-choice exams (JSONL cases), the runner, and gitignored reports
 web/                Gradio chat page (port 7860)
 notebooks/          Learning notebooks (01_tokens.ipynb)
 tests/              pytest suite (runs against real Postgres test databases)
@@ -89,6 +94,34 @@ docker-compose.yml  Local Postgres 17: one server, one database and login per se
 ```
 
 Each service owns its own database and login (`ledger_core`, `assistant`). The assistant never reads ledger-core's database; it calls ledger-core's API.
+
+## How an account question is answered
+
+The model never touches the data. It can only *ask* for a lookup; our code runs it.
+
+1. The router identifies the customer from their token and hands over to `ChatService`.
+2. `ChatService` saves the message and builds the prompt: the system rules plus recent history, trimmed to a token budget. Lookups from the last two assistant replies are replayed, labelled as snapshots that may be out of date.
+3. The agent loop (`assistant/services/agent.py`) asks the model, offering the tool menu. If the model asks for tools, the registry validates the arguments, runs the calls in parallel with a 2 second limit, and returns the results labelled as data. This repeats for up to 3 rounds and 6 calls, then the model must answer.
+4. The answer streams to the client as server-sent events (`token`, `tool`, `done`, `error`) and is saved with its lookups.
+
+Safety by design: no tool takes a customer id (the caller's token decides whose data it is), unknown arguments are rejected, tools are read-only, and text inside results is never treated as instructions.
+
+Tools: `get_accounts`, `get_withdrawals`, `get_transfers`, `get_transfer_status` (these four call ledger-core), `lookup_error_code` and `estimate_arrival` (pure code, so the model never does date arithmetic).
+
+## Evals
+
+`evals/` measures which tools the model chooses and with what arguments. It asks the real model each question and scores the tool requests; no tools are run.
+
+```bash
+uv run python -m evals.run_tool_eval                                        # main set
+uv run python -m evals.run_tool_eval --dataset evals/tools_hard.jsonl --runs 2
+uv run python -m evals.run_tool_eval --dataset evals/tools_multiturn.jsonl  # follow-up questions with history
+```
+
+- `--runs N` asks each question N times; a question that passes only some of the time is labelled FLAKY. `--min-score` sets the pass mark (exit code 1 below it, for CI).
+- Reports are written to `evals/results/latest.json`, including what the model said, so failures can be diagnosed.
+- Tune on the main, hard and multi-turn sets. The `*_holdout.jsonl` sets are for checking a fix on wording it was never tuned on, so run them sparingly.
+- `LLM_TEMPERATURE=0` keeps tool choice steady and the scores meaningful.
 
 ## Running locally
 
@@ -115,7 +148,7 @@ uv run uvicorn assistant.main:app --port 8001 --reload
 uv run python web/app.py            # chat page at http://localhost:7860
 ```
 
-Run the tests with `uv run pytest`. They use the `ledger_core_test` and `assistant_test` databases, so demo data is never touched.
+Run the tests with `uv run pytest` (46 tests). They use the `ledger_core_test` and `assistant_test` databases, so demo data is never touched.
 
 Changing a table: edit the model, run `uv run alembic -c <service>/alembic.ini revision --autogenerate -m "what changed"`, review the generated file, then `upgrade head`.
 
