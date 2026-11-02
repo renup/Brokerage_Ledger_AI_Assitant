@@ -1,40 +1,25 @@
 # Ask Ledger
 
-A help assistant for a fictional investing app. A customer can ask questions about their own account by typed text, voice, or screenshot. The assistant answers from real account data and help-center articles, and it refuses stock picks, off-topic requests, and attempts to access other customers' accounts.
+A help assistant for a fictional investing app. A team of AI agents answers questions about the customer's own account, proposes fixes, and waits for the customer's approval before anything changes. The assistant answers from real account data and help-center articles, and it refuses stock picks, off-topic requests, and attempts to access other customers' accounts.
 
 The AI runs on the company's servers. The iPhone app and the web page only send messages and display answers.
 
-This is a learning and portfolio project, built phase by phase from a study plan.
+This is a learning and portfolio project, built phase by phase from a study plan. The sections below describe the target design; the [Status](#status) table says what is built today.
 
 ## What it does
 
 - **Answers account questions.** The model calls tools on a fake brokerage backend (`ledger-core`) to look up balances, withdrawals, and transfers.
 - **Answers help questions with citations.** Retrieval over help-center articles (RAG), with sources cited.
+- **Proposes fixes and waits for approval.** Some tools can only *propose* a change (retry a transfer, update a legal name). Nothing runs until the customer approves, and every step is written to an audit log.
+- **Works as a team of agents.** A supervisor plans; an account agent (read only) and a knowledge agent (cites sources) work at the same time; a resolution agent can only propose; a critic checks the answer before the customer sees it.
 - **Refuses what it should.** Stock picks, off-topic requests, jailbreaks, multi-turn attacks, and requests for other accounts.
-- **Takes text, voice, and images.** Typed chat, speech-to-text and text-to-speech, and screenshot understanding with image safety checks.
 - **Is measurable.** Tracing, an evaluation gate, and fallbacks.
+
+Example: *"My IRA transfer failed and I need cash by Friday."* The account agent and the help-center agent work in parallel. The answer says the $1,200 withdrawal arrives tomorrow and a fixed transfer takes 5 to 7 business days, so it won't land by Friday. A proposed fix (update the legal name, resend the transfer) waits for the customer to approve with Face ID, and every step shows in an Activity log.
 
 ## App screens
 
-Mockups for the iPhone app (Phase 8). They show the behaviour the assistant is built to deliver.
-
-| Home | Chat with a cited answer | Voice |
-|------|--------------------------|-------|
-| ![Home screen: greeting, pending withdrawal, suggested questions](docs/images/01-home.png) | ![Chat: IRA transfer answer with source and action buttons](docs/images/02-chat.png) | ![Voice: spoken answer about a pending withdrawal](docs/images/03-voice.png) |
-
-| Screenshot understanding | Refusals |
-|--------------------------|----------|
-| ![Screenshot of a Code 214 transfer error explained in chat](docs/images/04-screenshot.png) | ![Refusals: stock pick, off-topic request, another person's account](docs/images/05-refusals.png) |
-
-- **Home:** shows what is happening on the customer's account right now (for example a pending withdrawal), plus common questions.
-- **Chat:** answers come with a source from the help center and action buttons such as "Start an IRA transfer".
-- **Voice:** the customer speaks, and the answer is read aloud with its source. Tapping interrupts it.
-- **Screenshot:** the customer shares an error screen. The assistant reads the error code and explains it using their account details.
-- **Refusals:** the assistant declines stock picks, off-topic requests, and attempts to reset someone else's password.
-
-### v2: agentic flow
-
-A second set of mockups shows where the assistant is heading: it still reads the account, but it can also *propose* a fix, and nothing changes until the customer approves. These screens are the design target. **None of v2 is built yet**; the approval flow is planned as step 5.4, and today's assistant is read-only.
+Mockups for the iPhone app (Phase 8). They show the behaviour the assistant is built to deliver. **None of the proposal, approval or agent screens is built yet**; today's assistant is read-only (see [Status](#status)).
 
 | Home | Chat with a proposed action | Developer mode |
 |------|-----------------------------|----------------|
@@ -44,41 +29,59 @@ A second set of mockups shows where the assistant is heading: it still reads the
 |----------|----------|
 | ![Approval sheet: two changes, approved with Face ID](docs/images/v2-04-approval.png) | ![Activity log: approved, proposed, read only, blocked and handoff entries](docs/images/v2-05-activity.png) |
 
-- **Home:** the account status now includes an "action waiting for your approval" card and an "Ask Ledger to fix this" button on the failed transfer.
-- **Chat:** shows "What I checked" first, then a sourced answer, then a clearly labelled **proposed, not done yet** action with "Review and approve" and "Not now".
-- **Developer mode:** an engineer-only trace of the agent graph. A supervisor plans; an account agent (read only) and a knowledge agent (cites sources) run at the same time; a resolution agent can only propose; a critic checks sources, policy and that every record belongs to the customer. The graph pauses until the customer approves.
-- **Approval:** lists each change plainly. The customer's tap, confirmed with Face ID, is what runs it. The assistant cannot do it alone.
-- **Activity:** an audit trail of everything read, proposed, blocked or handed to a human, with who did it and when.
+- **Home:** shows what is happening on the customer's account right now, an "action waiting for your approval" banner, and common questions. Built in steps 8.2 and 8.3, on top of the approval flow (5.4).
+- **Chat:** shows "What I checked" (from the tool and source events), then a sourced answer, then a clearly labelled **proposed, not done yet** action with "Review and approve" and "Not now". Customers never see agent names.
+- **Developer mode:** an internal trace for engineers and reviewers, off by default. It shows the supervisor's plan, the account and knowledge agents running in parallel, the resolution agent (propose only), and the critic's verdict, then the pause for approval. Built with the multi-agent phase (7B) and step 8.3. Customers never see this screen.
+- **Approval:** lists each change in plain words. The customer's tap, confirmed with Face ID, is what runs it. The assistant cannot do it alone. Built in steps 5.4 and 8.3.
+- **Activity:** the audit log of everything read, proposed, blocked or handed to a human, with who did it and when. Backed by the `audit_log` table and `GET /activity` (5.4).
+
+### Earlier mockups (v1)
+
+The first design also showed voice, screenshot understanding and refusals. Voice and image input are now optional stretch steps; refusals remain part of the safety layer (Phase 7).
+
+| Home | Chat with a cited answer | Voice |
+|------|--------------------------|-------|
+| ![Home screen: greeting, pending withdrawal, suggested questions](docs/images/01-home.png) | ![Chat: IRA transfer answer with source and action buttons](docs/images/02-chat.png) | ![Voice: spoken answer about a pending withdrawal](docs/images/03-voice.png) |
+
+| Screenshot understanding | Refusals |
+|--------------------------|----------|
+| ![Screenshot of a Code 214 transfer error explained in chat](docs/images/04-screenshot.png) | ![Refusals: stock pick, off-topic request, another person's account](docs/images/05-refusals.png) |
 
 ## Architecture
 
+Target design. Today the single agent loop in `assistant/services/agent.py` plays the role of the account agent, with read-only tools.
+
 ```
 iPhone app (SwiftUI) ─┐
-                      ├──> Chat API ──> Model (open source) ──> ledger-core tools
-Web chat page ────────┘        │                             └─> Help center search (RAG)
-                               └──> Safety layer, tracing, eval gate
+                      ├──> Chat API ──> Supervisor ─┬─> Account agent ────> ledger-core (read-only tools)
+Web chat page ────────┘        │                    ├─> Knowledge agent ──> Help center search (RAG)
+                               │                    └─> Resolution agent ─> proposed actions (propose only)
+                               │                              │
+                               │                           Critic ──> customer approves ──> ledger-core
+                               └──> Safety layer, audit log, tracing, eval gate
 ```
 
 ## Build plan
 
-About 180 hours over 16 weeks (roughly 11 hours per week). Work through the phases in order.
+About 190 hours over 17 weeks (roughly 11 hours per week). Work through the phases in order.
 
 | # | Phase | What you build |
 |---|-------|----------------|
 | 1 | Setup | Project folder, tools, and a big-picture video on LLMs |
 | 2 | Fake brokerage | `ledger-core`: customers, logins, accounts, withdrawals, transfers (no AI) |
 | 3 | Chat pipe | Chat API and a web chat page that returns a canned reply |
-| 4 | Real AI model | Connect an open-source model, first on a Mac, then on a rented GPU |
-| 5 | Account answers | Model calls `ledger-core` tools for account questions |
+| 4 | Real AI model | Open-source model on a Mac with Ollama, a system prompt and conversation memory |
+| 5 | Account answers | 14 tools (read, knowledge and propose-only) plus an approval flow with an audit log |
 | 6 | Help center (RAG) | Help articles plus search, with cited answers |
 | 7 | Safety layer | Checks for jailbreaks, off-topic requests, and multi-turn attacks |
-| 8 | iPhone app | SwiftUI app built from mockups |
-| 9 | Voice | Speech-to-text and text-to-speech |
-| 10 | Images | Screenshot understanding and image safety |
-| 11 | Monitoring | Tracing, an evaluation gate, and fallbacks |
-| 12 | Package and ship | Containers, CI, runbook, portfolio |
+| 7B | Multi-agent orchestration | Supervisor and specialist agents in LangGraph, parallel work, a critic, a durable pause for approval, and a single-agent vs multi-agent comparison |
+| 8 | iPhone app | SwiftUI app: chat, approval sheet, Activity screen and a hidden Developer mode |
+| 11 | Monitoring | Tracing (one span per agent), an evaluation gate, and fallbacks |
+| 12 | Package and ship | Docker Compose, CI, runbook, one cloud deployment, portfolio |
 
-The order is deliberate. The assistant needs account data before it can answer questions. The connection is built before the intelligence. Safety comes before more input types are added. The iPhone app comes after the backend is stable.
+Optional stretch steps: vLLM, voice and image understanding.
+
+The order is deliberate. The assistant needs account data before it can answer questions. The connection is built before the intelligence. Safety comes before more input types are added, and before the agent team, because every request, tool result and proposed action must pass the same guards. The iPhone app comes after the backend is stable.
 
 ## Status
 
@@ -88,8 +91,8 @@ The order is deliberate. The assistant needs account data before it can answer q
 | 2. Fake brokerage (`ledger-core`) | Done |
 | 3. Chat pipe | Done |
 | 4. Real AI model | Done: tokenizer notebook, local model via Ollama, system prompt, token-budgeted chat history, Postgres |
-| 5. Account answers | In progress: six read-only tools, an agent loop, saved lookups for follow-up questions, and tool-choice evals are done. Still to do: fee and tax-document tools, then the approval flow (5.4) |
-| 6–12 | Not started |
+| 5. Account answers | In progress: 6 of 14 tools are built (all read-only), with an agent loop, saved lookups for follow-up questions, and tool-choice evals. Still to do: the other read and knowledge tools (fees, tax documents, help-center search, withdrawal eligibility), the approval flow with the propose-only tools (5.4) |
+| 6, 7, 7B, 8, 11, 12 | Not started |
 
 ## Repository layout
 
