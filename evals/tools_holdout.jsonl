@@ -1,0 +1,8 @@
+{"id": "hold-01", "category": "transfers (unseen wording)", "question": "Has the move of my IRA from Schwab finished yet?", "expected_tools": ["get_transfers"], "expected_args": {}}
+{"id": "hold-02", "category": "transfers (unseen wording)", "question": "Is my account transfer taking longer than it should?", "expected_tools": ["get_transfers"], "expected_args": {}}
+{"id": "hold-03", "category": "transfers (unseen wording)", "question": "Any update on bringing my old brokerage account over?", "expected_tools": ["get_transfers"], "expected_args": {}}
+{"id": "hold-04", "category": "transfers (unseen wording)", "question": "Was my incoming transfer rejected?", "expected_tools": ["get_transfers"], "expected_args": {}}
+{"id": "hold-05", "category": "withdrawals (unseen wording)", "question": "Has my cash left my account to go to my bank yet?", "expected_tools": ["get_withdrawals"], "expected_args": {}}
+{"id": "hold-06", "category": "accounts (unseen wording)", "question": "What's the total I have available to withdraw?", "expected_tools": ["get_accounts"], "expected_args": {}}
+{"id": "hold-07", "category": "general (unseen wording)", "question": "Generally, how long do brokerages take to move an account?", "expected_tools": [], "expected_args": {}}
+{"id": "hold-08", "category": "general (unseen wording)", "question": "Can you explain what pending means for a withdrawal?", "expected_tools": [], "expected_args": {}}

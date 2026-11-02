@@ -1,20 +1,28 @@
 import asyncio
 import json
+import time
 
 from assistant import llm
 from assistant.llm import ToolCall
-from assistant.services.agent import MAX_TOOL_ROUNDS, Token, ToolStarted, run_agent
+from assistant.services.agent import MAX_TOOL_CALLS, MAX_TOOL_ROUNDS, Token, ToolRound, ToolStarted, run_agent
 
 
-# A stand-in for ToolRegistry: records what it was asked to run
+# A stand-in for ToolRegistry: records what it was asked to run.
+# "delay" makes every tool take that many seconds, to prove calls overlap.
 class FakeRegistry:
-    def __init__(self):
+    def __init__(self, delay=0.0):
         self.executed = []
+        self.delay = delay
+
+    @staticmethod
+    def error_result(name, message):
+        return json.dumps({"tool": name, "error": message})
 
     def definitions(self):
         return [{"type": "function", "function": {"name": "get_accounts"}}]
 
     async def execute(self, client, name, raw_arguments):
+        await asyncio.sleep(self.delay)
         self.executed.append((name, raw_arguments))
         return json.dumps({"tool": name, "data": ["fake"]})
 
@@ -55,7 +63,12 @@ def test_tool_request_runs_the_tool_then_asks_the_model_again(monkeypatch):
     calls = fake_model(monkeypatch, [[request], ["You have one account."]])
     events = collect(registry)
 
-    assert events == [ToolStarted("get_accounts"), Token("You have one account.")]
+    assert events[0] == ToolStarted("get_accounts")
+    # After the lookups finish, the loop reports what was asked and what came back, so it can be saved
+    assert isinstance(events[1], ToolRound)
+    assert events[1].records[0].id == "c1"
+    assert events[1].records[0].name == "get_accounts"
+    assert events[2] == Token("You have one account.")
     assert registry.executed == [("get_accounts", "{}")]
     # The second model call saw what it asked for AND the tool's result
     second_call_messages = calls[1][0]
@@ -73,3 +86,32 @@ def test_model_that_never_stops_asking_is_cut_off_and_forced_to_answer(monkeypat
     assert len(calls) == MAX_TOOL_ROUNDS + 1
     assert calls[-1][1] is None
     assert all(tools is not None for _, tools in calls[:-1])
+
+
+def test_tools_requested_together_run_at_the_same_time_and_results_keep_their_order(monkeypatch):
+    registry = FakeRegistry(delay=0.2)
+    requests = [ToolCall(id=f"c{i}", name="get_accounts", arguments="{}") for i in range(3)]
+    calls = fake_model(monkeypatch, [requests, ["Done."]])
+
+    started = time.monotonic()
+    collect(registry)
+    elapsed = time.monotonic() - started
+
+    # Three 0.2s tools one after another would take 0.6s; side by side they take about 0.2s
+    assert elapsed < 0.45
+    # Each result is still attached to the request it answers, in the original order
+    tool_messages = [m for m in calls[1][0] if m["role"] == "tool"]
+    assert [m["tool_call_id"] for m in tool_messages] == ["c0", "c1", "c2"]
+
+
+def test_more_than_the_limit_runs_only_the_limit_but_every_request_gets_an_answer(monkeypatch):
+    registry = FakeRegistry()
+    requests = [ToolCall(id=f"c{i}", name="get_accounts", arguments="{}") for i in range(MAX_TOOL_CALLS + 2)]
+    calls = fake_model(monkeypatch, [requests, ["Done."]])
+    collect(registry)
+
+    assert len(registry.executed) == MAX_TOOL_CALLS
+    tool_messages = [m for m in calls[1][0] if m["role"] == "tool"]
+    # All 8 requests were answered; the last 2 were told "too many lookups"
+    assert len(tool_messages) == MAX_TOOL_CALLS + 2
+    assert all("Too many lookups" in m["content"] for m in tool_messages[MAX_TOOL_CALLS:])
