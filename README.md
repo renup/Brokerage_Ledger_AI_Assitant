@@ -32,6 +32,24 @@ Mockups for the iPhone app (Phase 8). They show the behaviour the assistant is b
 - **Screenshot:** the customer shares an error screen. The assistant reads the error code and explains it using their account details.
 - **Refusals:** the assistant declines stock picks, off-topic requests, and attempts to reset someone else's password.
 
+### v2: agentic flow
+
+A second set of mockups shows where the assistant is heading: it still reads the account, but it can also *propose* a fix, and nothing changes until the customer approves. These screens are the design target. **None of v2 is built yet**; the approval flow is planned as step 5.4, and today's assistant is read-only.
+
+| Home | Chat with a proposed action | Developer mode |
+|------|-----------------------------|----------------|
+| ![Home: pending withdrawal, failed IRA transfer, and one action waiting for approval](docs/images/v2-01-home.png) | ![Chat: what was checked, a sourced answer, and a "Proposed, not done yet" card](docs/images/v2-02-chat-proposal.png) | ![Developer mode: supervisor, account and knowledge agents in parallel, resolution agent, critic, paused for approval](docs/images/v2-03-developer-mode.png) |
+
+| Approval | Activity |
+|----------|----------|
+| ![Approval sheet: two changes, approved with Face ID](docs/images/v2-04-approval.png) | ![Activity log: approved, proposed, read only, blocked and handoff entries](docs/images/v2-05-activity.png) |
+
+- **Home:** the account status now includes an "action waiting for your approval" card and an "Ask Ledger to fix this" button on the failed transfer.
+- **Chat:** shows "What I checked" first, then a sourced answer, then a clearly labelled **proposed, not done yet** action with "Review and approve" and "Not now".
+- **Developer mode:** an engineer-only trace of the agent graph. A supervisor plans; an account agent (read only) and a knowledge agent (cites sources) run at the same time; a resolution agent can only propose; a critic checks sources, policy and that every record belongs to the customer. The graph pauses until the customer approves.
+- **Approval:** lists each change plainly. The customer's tap, confirmed with Face ID, is what runs it. The assistant cannot do it alone.
+- **Activity:** an audit trail of everything read, proposed, blocked or handed to a human, with who did it and when.
+
 ## Architecture
 
 ```
