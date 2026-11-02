@@ -60,11 +60,11 @@ class ToolRegistry:
         except LedgerUnavailableError:
             return self.error_result(name, "The account system is not responding right now. Ask the customer to try again soon.")
 
-        return self._data(name, result)
+        return self.data_result(name, result)
 
     # Successful result, labelled so the model treats it as information and not as orders
     @staticmethod
-    def _data(name: str, result: object) -> str:
+    def data_result(name: str, result: object) -> str:
         return json.dumps(
             {
                 "tool": name,

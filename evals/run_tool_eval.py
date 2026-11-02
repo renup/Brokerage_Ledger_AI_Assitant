@@ -15,7 +15,9 @@ from pathlib import Path
 
 from assistant.config import settings
 from assistant.llm import ToolCall, stream_turn
+from assistant.models import Message
 from assistant.services.chat_service import system_prompt
+from assistant.services.history import trim_to_budget
 from assistant.tools.read import READ_TOOLS
 from assistant.tools.registry import ToolRegistry
 
@@ -30,13 +32,49 @@ def load_cases(path: Path) -> list[dict]:
         return [json.loads(line) for line in f if line.strip()]
 
 
-# Asks the model one question and returns the tools it asked for (an empty list = it answered in words)
-async def ask_model(question: str) -> tuple[list[ToolCall], str]:
+# A fixed time stamped on the canned lookups, so the replayed "Looked up at" label reads like a real one
+HISTORY_TIME = "2026-11-01T10:00:00+00:00"
+
+
+# Turns a case into the messages the model receives, using the app's own history code
+# (replay and token trimming), so we test exactly what a real follow-up looks like.
+# A case with no "history" is a single question, as before.
+def build_messages(case: dict) -> list[dict]:
+    rows = []
+    for turn in case.get("history", []):
+        # The lookups the assistant is pretending to have made in that earlier turn
+        records = [
+            {
+                "id": f"h{len(rows)}-{n}",
+                "name": lookup["tool"],
+                "arguments": json.dumps(lookup["arguments"]),
+                "result": REGISTRY.data_result(lookup["tool"], lookup["data"]),
+            }
+            for n, lookup in enumerate(turn.get("lookups", []))
+        ]
+        trace = [{"records": records, "at": HISTORY_TIME}] if records else []
+        rows.append(
+            Message(
+                message_id=str(len(rows)), session_id="eval", customer_id_hash="eval",
+                role=turn["role"], text=turn["text"], tool_trace_json=json.dumps(trace),
+            )
+        )
+    # The question being scored is the newest message
+    rows.append(
+        Message(message_id=str(len(rows)), session_id="eval", customer_id_hash="eval", role="user", text=case["question"])
+    )
+
     rules = system_prompt().replace("{first_name}", "Maya")
-    messages = [{"role": "system", "content": rules}, {"role": "user", "content": question}]
+    # trim_to_budget wants newest first, the order the repository returns them in
+    history = trim_to_budget(list(reversed(rows)), settings.history_token_budget)
+    return [{"role": "system", "content": rules}] + history
+
+
+# Asks the model one question and returns the tools it asked for (an empty list = it answered in words)
+async def ask_model(case: dict) -> tuple[list[ToolCall], str]:
     calls = []
     words = []
-    async for item in stream_turn(messages, REGISTRY.definitions()):
+    async for item in stream_turn(build_messages(case), REGISTRY.definitions()):
         # Tool requests are what we score; the words are kept as evidence
         if isinstance(item, ToolCall):
             calls.append(item)
@@ -120,7 +158,7 @@ def fingerprint() -> str:
 
 # Asks the model one question once and scores what it did
 async def one_try(case: dict) -> dict:
-    calls, words = await ask_model(case["question"])
+    calls, words = await ask_model(case)
     return score_case(case, calls, words)
 
 
