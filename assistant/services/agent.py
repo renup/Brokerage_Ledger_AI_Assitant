@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from assistant import llm
+from assistant.llm import tool_request_message, tool_result_message
 from assistant.clients.ledger import LedgerClient
 from assistant.tools.registry import ToolRegistry
 
@@ -75,16 +76,7 @@ async def run_agent(
             return
 
         # Record what the model asked for. The next call needs it to make sense of the results.
-        conversation.append(
-            {
-                "role": "assistant",
-                "content": "",
-                "tool_calls": [
-                    {"id": c.id, "type": "function", "function": {"name": c.name, "arguments": c.arguments}}
-                    for c in tool_calls
-                ],
-            }
-        )
+        conversation.append(tool_request_message((c.id, c.name, c.arguments) for c in tool_calls))
 
         # Safety limit: only run as many calls as still fit under MAX_TOOL_CALLS in total.
         # "room" is how many are left; the list is cut into the ones we run and the ones we skip.
@@ -106,14 +98,14 @@ async def run_agent(
         # "records" also remembers each one, so ChatService can save them for later turns.
         records = []
         for call, result in zip(to_run, results):
-            conversation.append({"role": "tool", "tool_call_id": call.id, "content": result})
+            conversation.append(tool_result_message(call.id, result))
             records.append(ToolRecord(call.id, call.name, call.arguments, result))
 
         # The model must get an answer to EVERY request it made, or its next turn is malformed.
         # For requests we refused to run (over the limit), the answer is "too many lookups".
         for call in skipped:
             limit_result = registry.error_result(call.name, "Too many lookups for one question. Answer with what you have.")
-            conversation.append({"role": "tool", "tool_call_id": call.id, "content": limit_result})
+            conversation.append(tool_result_message(call.id, limit_result))
             records.append(ToolRecord(call.id, call.name, call.arguments, limit_result))
 
         # Report the whole round now that every result is in

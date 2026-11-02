@@ -15,6 +15,25 @@ class ToolCall:
     arguments: str
 
 
+# The message that records "the assistant asked for these lookups". "calls" is a list of
+# (id, name, arguments) triples. Used by the agent loop and when replaying saved history,
+# so the shape is written in one place only.
+def tool_request_message(calls) -> dict:
+    return {
+        "role": "assistant",
+        "content": "",
+        "tool_calls": [
+            {"id": call_id, "type": "function", "function": {"name": name, "arguments": arguments}}
+            for call_id, name, arguments in calls
+        ],
+    }
+
+
+# The message that hands one lookup result back to the model, tied to the request it answers
+def tool_result_message(call_id: str, content: str) -> dict:
+    return {"role": "tool", "tool_call_id": call_id, "content": content}
+
+
 # The one place we talk to the model. An async generator: each "yield" hands something to the
 # caller immediately, instead of waiting for the whole reply. It yields two kinds of thing:
 #   - a str: the next bit of the answer in words
