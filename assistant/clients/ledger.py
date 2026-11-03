@@ -24,16 +24,19 @@ class LedgerClient:
         self.headers = {"Authorization": f"Bearer {token}"}
 
     # The one place a request is made, so timeouts and error handling exist exactly once
-    async def _get(self, path: str, params: dict | None = None):
+    async def _request(self, method: str, path: str, params: dict | None = None):
         try:
             # timeout=2.0: give up after 2 seconds instead of making the customer wait
-            response = await self.http.get(path, headers=self.headers, params=params, timeout=2.0)
+            response = await self.http.request(method, path, headers=self.headers, params=params, timeout=2.0)
         except httpx.RequestError as exc:
             # "from exc" keeps the original network error attached for debugging
             raise LedgerUnavailableError("Could not reach ledger-core") from exc
         if response.status_code != 200:
             raise LedgerRejectedError(response.status_code)
         return response.json()
+
+    async def _get(self, path: str, params: dict | None = None):
+        return await self._request("GET", path, params)
 
     async def accounts(self) -> list[dict]:
         return await self._get("/me/accounts")
@@ -56,3 +59,8 @@ class LedgerClient:
     # year: a tax year to filter by; None means every year (the parameter is left out)
     async def tax_documents(self, year: int | None = None) -> list[dict]:
         return await self._get("/me/tax-documents", params={"year": year} if year else None)
+
+    # Puts a failed transfer back in the queue. A POST, because it changes something.
+    # ledger-core answers 409 if the transfer is not in the failed state.
+    async def retry_transfer(self, transfer_id: int) -> dict:
+        return await self._request("POST", f"/me/transfers/{transfer_id}/retry")
