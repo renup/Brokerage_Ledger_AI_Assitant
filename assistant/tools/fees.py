@@ -1,9 +1,8 @@
-from assistant.clients.ledger import LedgerClient
-from assistant.tools.base import NoArgs, Tool
+from assistant.tools.base import NoArgs, Tool, ToolContext
 
 
-async def get_fees(client: LedgerClient, args: NoArgs):
-    return await client.fees()
+async def get_fees(context: ToolContext, args: NoArgs):
+    return await context.ledger.fees()
 
 
 TOOLS = [

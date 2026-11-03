@@ -19,6 +19,7 @@ from assistant.sse import sse
 
 from assistant.clients.ledger import LedgerClient
 from assistant.services.agent import ToolRound, ToolStarted, run_agent
+from assistant.tools.base import ToolContext
 from assistant.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
@@ -80,7 +81,7 @@ class ChatService:
         rounds = []
         try:
             # run_agent reports three kinds of event: words for the customer, "a tool is running", and a finished round of lookups
-            async for event in run_agent(messages, self.registry, self.ledger):
+            async for event in run_agent(messages, self.registry, ToolContext(self.ledger)):
                 if isinstance(event, ToolStarted):
                     # Lets the app show "Checking your account…" while the tool works
                     yield sse("tool", {"name": event.name})

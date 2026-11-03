@@ -1,15 +1,14 @@
 from pydantic import Field
 
-from assistant.clients.ledger import LedgerClient
-from assistant.tools.base import Tool, ToolArgs
+from assistant.tools.base import Tool, ToolArgs, ToolContext
 
 
 class TaxDocumentsArgs(ToolArgs):
     year: int | None = Field(default=None, ge=2000, le=2100, description="The tax year, for example 2025. Leave out for every year.")
 
 
-async def get_tax_documents(client: LedgerClient, args: TaxDocumentsArgs):
-    return await client.tax_documents(args.year)
+async def get_tax_documents(context: ToolContext, args: TaxDocumentsArgs):
+    return await context.ledger.tax_documents(args.year)
 
 
 TOOLS = [

@@ -1,7 +1,7 @@
 import asyncio
 import json
 
-from assistant.tools.base import NoArgs, Tool
+from assistant.tools.base import NoArgs, Tool, ToolContext
 
 from assistant.clients.ledger import LedgerRejectedError, LedgerUnavailableError
 from assistant.tools import ALL_TOOLS
@@ -42,7 +42,7 @@ class FakeLedger:
 
 
 def run(ledger, name, arguments):
-    return json.loads(asyncio.run(registry.execute(ledger, name, arguments)))
+    return json.loads(asyncio.run(registry.execute(ToolContext(ledger), name, arguments)))
 
 
 # --- Authorization: the model can never choose whose data it reads ---
@@ -102,7 +102,7 @@ def test_ledger_core_down_gives_a_try_again_message():
 
 
 def test_a_tool_that_takes_too_long_is_cut_off_with_a_readable_error():
-    async def very_slow(client, args):
+    async def very_slow(context, args):
         await asyncio.sleep(5)
 
     slow = Tool(name="slow", description="never finishes in time", args_model=NoArgs, run=very_slow)

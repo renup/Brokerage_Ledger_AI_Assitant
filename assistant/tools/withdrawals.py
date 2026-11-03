@@ -2,8 +2,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from assistant.clients.ledger import LedgerClient
-from assistant.tools.base import Tool, ToolArgs
+from assistant.tools.base import Tool, ToolArgs, ToolContext
 
 
 # Notice: no customer id. The caller's token decides whose withdrawals these are.
@@ -16,8 +15,8 @@ class WithdrawalsArgs(ToolArgs):
     )
 
 
-async def get_withdrawals(client: LedgerClient, args: WithdrawalsArgs):
-    return await client.withdrawals(args.status)
+async def get_withdrawals(context: ToolContext, args: WithdrawalsArgs):
+    return await context.ledger.withdrawals(args.status)
 
 
 TOOLS = [

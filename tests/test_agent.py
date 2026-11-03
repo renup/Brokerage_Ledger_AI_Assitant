@@ -21,7 +21,7 @@ class FakeRegistry:
     def definitions(self):
         return [{"type": "function", "function": {"name": "get_accounts"}}]
 
-    async def execute(self, client, name, raw_arguments):
+    async def execute(self, context, name, raw_arguments):
         await asyncio.sleep(self.delay)
         self.executed.append((name, raw_arguments))
         return json.dumps({"tool": name, "data": ["fake"]})
@@ -45,7 +45,7 @@ def fake_model(monkeypatch, turns):
 # (non-async) test drive async code, so we need no extra pytest plugin.
 def collect(registry):
     async def run():
-        return [event async for event in run_agent([{"role": "user", "content": "hi"}], registry, client=None)]
+        return [event async for event in run_agent([{"role": "user", "content": "hi"}], registry, context=None)]
 
     return asyncio.run(run())
 
