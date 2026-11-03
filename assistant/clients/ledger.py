@@ -48,3 +48,11 @@ class LedgerClient:
 
     async def transfer(self, transfer_id: int) -> dict:
         return await self._get(f"/me/transfers/{transfer_id}")
+
+    # The fees that apply to this customer's account types
+    async def fees(self) -> list[dict]:
+        return await self._get("/me/fees")
+
+    # year: a tax year to filter by; None means every year (the parameter is left out)
+    async def tax_documents(self, year: int | None = None) -> list[dict]:
+        return await self._get("/me/tax-documents", params={"year": year} if year else None)

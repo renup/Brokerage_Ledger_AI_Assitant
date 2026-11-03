@@ -39,6 +39,10 @@ class EstimateArrivalArgs(ToolArgs):
     business_days: int = Field(ge=1, le=10, description="How many business days the money takes, from 1 to 10.")
     start_date: date | None = Field(default=None, description="The day it starts, as YYYY-MM-DD. Leave out for today.")
 
+
+class TaxDocumentsArgs(ToolArgs):
+    year: int | None = Field(default=None, ge=2000, le=2100, description="The tax year, for example 2025. Leave out for every year.")
+
 class TransferStatusArgs(ToolArgs):
     transfer_id: int = Field(description="The id of one transfer, as returned by get_transfers.")
 
@@ -82,6 +86,14 @@ async def estimate_arrival(client: LedgerClient, args: EstimateArrivalArgs):
         "arrival_weekday": arrival.strftime("%A"),
         "note": "Counts Monday to Friday only. Market holidays are not included, so it could be one day later.",
     }
+
+
+async def get_fees(client: LedgerClient, args: NoArgs):
+    return await client.fees()
+
+
+async def get_tax_documents(client: LedgerClient, args: TaxDocumentsArgs):
+    return await client.tax_documents(args.year)
 
 
 # --- The list the registry is built from ---
@@ -133,5 +145,22 @@ READ_TOOLS = [
         "For a withdrawal the customer already made, use get_withdrawals instead.",
         args_model=EstimateArrivalArgs,
         run=estimate_arrival,
+    ),
+    Tool(
+        name="get_fees",
+        description="List the fees that apply to the customer's own accounts, with the amount in dollars, "
+        "how often it is charged, and a short description. Use for questions about what something costs, "
+        "such as charges for moving an account out, wires, statements or account upkeep. "
+        "Do not use for how much money is in an account.",
+        args_model=NoArgs,
+        run=get_fees,
+    ),
+    Tool(
+        name="get_tax_documents",
+        description="List the customer's own tax forms (such as 1099 or 5498) with the tax year, status "
+        "and where to download them. Use for questions about whether a form is ready, which forms they have, "
+        "or where to find one. Do not use for general tax advice or how to file.",
+        args_model=TaxDocumentsArgs,
+        run=get_tax_documents,
     ),
 ]

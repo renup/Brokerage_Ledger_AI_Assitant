@@ -35,6 +35,12 @@ class FakeLedger:
     async def transfer(self, transfer_id):
         return await self._answer("transfer", transfer_id)
 
+    async def fees(self):
+        return await self._answer("fees")
+
+    async def tax_documents(self, year=None):
+        return await self._answer("tax_documents", year)
+
 
 def run(ledger, name, arguments):
     return json.loads(asyncio.run(registry.execute(ledger, name, arguments)))
@@ -104,3 +110,25 @@ def test_a_tool_that_takes_too_long_is_cut_off_with_a_readable_error():
     quick_timeout = ToolRegistry([slow], timeout=0.05)
     result = json.loads(asyncio.run(quick_timeout.execute(FakeLedger(), "slow", "{}")))
     assert "took too long" in result["error"]
+
+
+def test_fees_tool_asks_ledger_core_for_the_callers_fees():
+    ledger = FakeLedger()
+    result = run(ledger, "get_fees", "{}")
+    assert ledger.calls == [("fees",)]
+    assert result["tool"] == "get_fees"
+
+
+def test_tax_documents_tool_passes_the_year_on():
+    ledger = FakeLedger()
+    run(ledger, "get_tax_documents", '{"year": 2025}')
+    assert ledger.calls == [("tax_documents", 2025)]
+
+
+# The year is optional, and a nonsense year is rejected before ledger-core is called
+def test_tax_documents_year_is_optional_and_checked():
+    ledger = FakeLedger()
+    run(ledger, "get_tax_documents", "{}")
+    assert ledger.calls == [("tax_documents", None)]
+    assert "error" in run(ledger, "get_tax_documents", '{"year": 1850}')
+    assert len(ledger.calls) == 1
