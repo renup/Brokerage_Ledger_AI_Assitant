@@ -5,8 +5,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from assistant.config import settings
-from assistant.errors import NotFoundError
-from assistant.routers import chat, health, sessions
+from assistant.errors import NotFoundError, ActionAlreadyDecidedError, ActionExpiredError
+from assistant.routers import chat, health, sessions, actions
 
 
 # "lifespan" runs code once when the server starts (before "yield") and once when it stops.
@@ -30,7 +30,18 @@ app = FastAPI(title="assistant", lifespan=lifespan)
 async def not_found_handler(request: Request, exc: NotFoundError):
     return JSONResponse(status_code=404, content={"detail": str(exc)})
 
+# 410 Gone: it existed, but its 24 hours are over
+@app.exception_handler(ActionExpiredError)
+async def action_expired_handler(request: Request, exc: ActionExpiredError):
+    return JSONResponse(status_code=410, content={"detail": str(exc)})
+
+# 409 Conflict: already approved, rejected or finished (also what the loser of a double tap gets)
+@app.exception_handler(ActionAlreadyDecidedError)
+async def action_already_decided_handler(request: Request, exc: ActionAlreadyDecidedError):
+    return JSONResponse(status_code=409, content={"detail": str(exc)})
+
 
 app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(sessions.router)
+app.include_router(actions.router)

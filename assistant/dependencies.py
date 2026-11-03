@@ -8,7 +8,10 @@ from assistant.auth import get_bearer_token
 from assistant.clients.ledger import LedgerClient
 from assistant.database import get_db
 from assistant.repositories.messages import MessageRepository
+from assistant.repositories.actions import ActionRepository
+from assistant.repositories.audit import AuditRepository
 from assistant.services.chat_service import ChatService
+from assistant.services.action_service import ActionService
 from assistant.tools import ALL_TOOLS
 from assistant.tools.registry import ToolRegistry
 
@@ -46,3 +49,12 @@ def get_chat_service(
     registry: ToolRegistry = Depends(get_tool_registry),
 ) -> ChatService:
     return ChatService(repo, ledger, registry)
+
+
+# One ActionService per request: this request's database session, and a ledger client that
+# carries THIS caller's token, so an approved change is made as them.
+def get_action_service(
+    db: Session = Depends(get_db),
+    ledger: LedgerClient = Depends(get_ledger_client),
+) -> ActionService:
+    return ActionService(db, ActionRepository(db), AuditRepository(db), ledger)
