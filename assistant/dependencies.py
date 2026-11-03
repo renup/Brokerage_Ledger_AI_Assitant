@@ -9,7 +9,7 @@ from assistant.clients.ledger import LedgerClient
 from assistant.database import get_db
 from assistant.repositories.messages import MessageRepository
 from assistant.services.chat_service import ChatService
-from assistant.tools.read import READ_TOOLS
+from assistant.tools import ALL_TOOLS
 from assistant.tools.registry import ToolRegistry
 
 
@@ -37,7 +37,7 @@ def get_ledger_client(
 # The tool menu is the same for every customer, so build it once and reuse it
 @lru_cache
 def get_tool_registry() -> ToolRegistry:
-    return ToolRegistry(READ_TOOLS)
+    return ToolRegistry(ALL_TOOLS)
 
 
 def get_chat_service(

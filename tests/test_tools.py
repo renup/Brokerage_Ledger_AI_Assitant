@@ -1,14 +1,13 @@
 import asyncio
 import json
 
-from assistant.tools.base import Tool
-from assistant.tools.read import NoArgs
+from assistant.tools.base import NoArgs, Tool
 
 from assistant.clients.ledger import LedgerRejectedError, LedgerUnavailableError
-from assistant.tools.read import READ_TOOLS
+from assistant.tools import ALL_TOOLS
 from assistant.tools.registry import ToolRegistry
 
-registry = ToolRegistry(READ_TOOLS)
+registry = ToolRegistry(ALL_TOOLS)
 
 
 # A stand-in for LedgerClient that records calls and can be told to fail

@@ -3,7 +3,7 @@ import json
 from datetime import date
 
 from assistant.knowledge.business_days import add_business_days
-from assistant.tools.read import READ_TOOLS
+from assistant.tools import ALL_TOOLS
 from assistant.tools.registry import ToolRegistry
 
 
@@ -19,7 +19,7 @@ def test_start_on_weekend():
 
 # Runs the tool the way the agent does: through the registry. The client is not needed, so None.
 def run_tool(arguments: dict) -> dict:
-    registry = ToolRegistry(READ_TOOLS)
+    registry = ToolRegistry(ALL_TOOLS)
     raw = asyncio.run(registry.execute(None, "estimate_arrival", json.dumps(arguments)))
     return json.loads(raw)
 

@@ -11,6 +11,12 @@ from assistant.clients.ledger import LedgerClient
 class ToolArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+
+# For tools that need no input. Shared, so it lives here and not in any one tool's file.
+class NoArgs(ToolArgs):
+    pass
+
+
 # One tool the model may use. "frozen" means it can't be changed after creation.
 @dataclass(frozen=True)
 class Tool:
