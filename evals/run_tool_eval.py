@@ -18,12 +18,12 @@ from assistant.llm import ToolCall, stream_turn
 from assistant.models import Message
 from assistant.services.chat_service import system_prompt
 from assistant.services.history import trim_to_budget
-from assistant.tools.read import READ_TOOLS
+from assistant.tools import ALL_TOOLS
 from assistant.tools.registry import ToolRegistry
 
 # The same tool menu and the same system prompt the real app uses, so we test what customers get
-REGISTRY = ToolRegistry(READ_TOOLS)
-TOOLS_BY_NAME = {tool.name: tool for tool in READ_TOOLS}
+REGISTRY = ToolRegistry(ALL_TOOLS)
+TOOLS_BY_NAME = {tool.name: tool for tool in ALL_TOOLS}
 
 
 # One JSON object per line: {"id", "category", "question", "expected_tools", "expected_args"}

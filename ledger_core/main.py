@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from ledger_core.routers import accounts, login, me, transfers, withdrawals
+from ledger_core.routers import accounts, fees, login, me, tax_documents, transfers, withdrawals
 
 # The app. The title shows at the top of the /docs page.
 app = FastAPI(title="ledger-core")
@@ -12,6 +12,8 @@ app.include_router(me.router)
 app.include_router(accounts.router)
 app.include_router(withdrawals.router)
 app.include_router(transfers.router)
+app.include_router(fees.router)
+app.include_router(tax_documents.router)
 
 
 # A cheap way for people and tools to ask "is the service up?"

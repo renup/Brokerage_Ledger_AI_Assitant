@@ -1,0 +1,13 @@
+from assistant.tools import accounts, arrival_estimates, error_codes, fees, tax_documents, transfers, withdrawals
+
+# The one list of every tool the model may use. To add a tool: write its file, then add it here.
+# The order is the order the model sees them in.
+ALL_TOOLS = [
+    *accounts.TOOLS,
+    *withdrawals.TOOLS,
+    *transfers.TOOLS,
+    *error_codes.TOOLS,
+    *arrival_estimates.TOOLS,
+    *fees.TOOLS,
+    *tax_documents.TOOLS,
+]

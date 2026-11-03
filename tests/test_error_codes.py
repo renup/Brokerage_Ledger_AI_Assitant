@@ -2,7 +2,7 @@ import asyncio
 import json
 
 from assistant.knowledge.error_codes import explain_error
-from assistant.tools.read import READ_TOOLS
+from assistant.tools import ALL_TOOLS
 from assistant.tools.registry import ToolRegistry
 
 
@@ -20,7 +20,7 @@ def test_unknown_code_returns_none():
 
 # Runs the tool the way the agent does: through the registrd, so None.
 def run_tool(code: str) -> dict:
-    registry = ToolRegistry(READ_TOOLS)
+    registry = ToolRegistry(ALL_TOOLS)
     raw = asyncio.run(registry.execute(None, "lookup_error_code", json.dumps({"code": code})))
     return json.loads(raw)["data"]
 

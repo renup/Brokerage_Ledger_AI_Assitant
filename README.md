@@ -91,7 +91,7 @@ The order is deliberate. The assistant needs account data before it can answer q
 | 2. Fake brokerage (`ledger-core`) | Done |
 | 3. Chat pipe | Done |
 | 4. Real AI model | Done: tokenizer notebook, local model via Ollama, system prompt, token-budgeted chat history, Postgres |
-| 5. Account answers | In progress: 6 of 14 tools are built (all read-only), with an agent loop, saved lookups for follow-up questions, and tool-choice evals. Still to do: the other read and knowledge tools (fees, tax documents, help-center search, withdrawal eligibility), the approval flow with the propose-only tools (5.4) |
+| 5. Account answers | In progress: 8 of 14 tools are built (all read-only), with an agent loop, saved lookups for follow-up questions, and tool-choice evals. Still to do: the other read and knowledge tools (fees, tax documents, help-center search, withdrawal eligibility), the approval flow with the propose-only tools (5.4) |
 | 6, 7, 7B, 8, 11, 12 | Not started |
 
 ## Repository layout
@@ -103,7 +103,9 @@ assistant/          Chat API (port 8001), layered:
   services/           Chat logic, the agent loop (agent.py) and token-budgeted history (no HTTP, no SQL)
   repositories/       The only place that runs database queries
   clients/            Calls to ledger-core, made with the caller's own token
-  tools/              What the model may ask for: argument models, the read tools, and a registry that validates and runs them
+  tools/              What the model may ask for: one module per purpose (accounts, withdrawals, transfers, fees, tax_documents,
+                      error_codes, arrival_estimates), each with its arguments, code and menu entry; __init__.py lists them all;
+                      registry.py validates and runs them
   knowledge/          Facts kept in code: the transfer error-code catalog and business-day date math
   migrations/         Alembic migrations for the assistant's database
   prompts/system.md   The system prompt
@@ -127,7 +129,7 @@ The model never touches the data. It can only *ask* for a lookup; our code runs 
 
 Safety by design: no tool takes a customer id (the caller's token decides whose data it is), unknown arguments are rejected, tools are read-only, and text inside results is never treated as instructions.
 
-Tools: `get_accounts`, `get_withdrawals`, `get_transfers`, `get_transfer_status` (these four call ledger-core), `lookup_error_code` and `estimate_arrival` (pure code, so the model never does date arithmetic).
+Tools: `get_accounts`, `get_withdrawals`, `get_transfers`, `get_transfer_status`, `get_fees` and `get_tax_documents` (these six call ledger-core), `lookup_error_code` and `estimate_arrival` (pure code, so the model never does date arithmetic). To add a tool, write its module in `assistant/tools/` and add it to `ALL_TOOLS` in `assistant/tools/__init__.py`.
 
 ## Evals
 
