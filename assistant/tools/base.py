@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict
 
 from assistant.action_types import ActionKind
 from assistant.clients.ledger import LedgerClient
-from assistant.models import PendingAction
+from assistant.schemas import ProposalOut
 
 
 # Base class for every tool's arguments. extra="forbid" means any argument we did not
@@ -19,9 +19,10 @@ class NoArgs(ToolArgs):
     pass
 
 
-# Saves a proposal for the customer to approve: (kind, details, plain-words summary) -> the saved row.
+# Saves a proposal for the customer to approve: (kind, details, plain-words summary) -> its public
+# form (id, summary, expiry). A plain object, not a database row, because the session that saved it is closed.
 # The tool never sees a database; it can only call this.
-ProposalSaver = Callable[[ActionKind, dict, str], PendingAction]
+ProposalSaver = Callable[[ActionKind, dict, str], ProposalOut]
 
 
 # Everything a tool is allowed to use, built fresh for each customer message.
