@@ -1,10 +1,9 @@
-from assistant.clients.ledger import LedgerClient
-from assistant.tools.base import NoArgs, Tool
+from assistant.tools.base import NoArgs, Tool, ToolContext
 
 
 # One call to ledger-core, as the caller. The caller's token decides whose accounts these are.
-async def get_accounts(client: LedgerClient, args: NoArgs):
-    return await client.accounts()
+async def get_accounts(context: ToolContext, args: NoArgs):
+    return await context.ledger.accounts()
 
 
 TOOLS = [

@@ -2,9 +2,8 @@ from datetime import date
 
 from pydantic import Field
 
-from assistant.clients.ledger import LedgerClient
 from assistant.knowledge.business_days import add_business_days
-from assistant.tools.base import Tool, ToolArgs
+from assistant.tools.base import Tool, ToolArgs, ToolContext
 
 
 class EstimateArrivalArgs(ToolArgs):
@@ -13,7 +12,7 @@ class EstimateArrivalArgs(ToolArgs):
 
 
 # Another tool with no call to ledger-core: the date math is done in code, never by the model
-async def estimate_arrival(client: LedgerClient, args: EstimateArrivalArgs):
+async def estimate_arrival(context: ToolContext, args: EstimateArrivalArgs):
     # No start date means today
     start = args.start_date or date.today()
     arrival = add_business_days(start, args.business_days)

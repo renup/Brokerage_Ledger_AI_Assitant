@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from assistant import llm
 from assistant.llm import tool_request_message, tool_result_message
-from assistant.clients.ledger import LedgerClient
+from assistant.tools.base import ToolContext
 from assistant.tools.registry import ToolRegistry
 
 # How many times the model may ask for tools in one customer message. After that we force an answer.
@@ -51,7 +51,7 @@ class ToolRound:
 #   4. They read the results and answer (or ask for more lookups, up to a limit).
 # Each trip through the "for" loop below is one such round.
 async def run_agent(
-    messages: list[dict], registry: ToolRegistry, client: LedgerClient
+    messages: list[dict], registry: ToolRegistry, context: ToolContext
 ) -> AsyncIterator[Token | ToolStarted | ToolRound]:
     # Work on a copy, so tool calls and results don't leak into the caller's list
     conversation = list(messages)
@@ -92,7 +92,7 @@ async def run_agent(
         # 1 second each, this finishes in about 1 second, not 2. gather() waits until every one is
         # done and gives the results back in the same order as to_run, so each result still
         # lines up with the request it answers.
-        results = await asyncio.gather(*(registry.execute(client, c.name, c.arguments) for c in to_run))
+        results = await asyncio.gather(*(registry.execute(context, c.name, c.arguments) for c in to_run))
 
         # Hand each result back to the model, labelled with the id of the request it answers.
         # "records" also remembers each one, so ChatService can save them for later turns.

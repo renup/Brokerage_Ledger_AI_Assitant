@@ -1,17 +1,16 @@
 from pydantic import Field
 
-from assistant.clients.ledger import LedgerClient
 from assistant.knowledge.error_codes import explain_error
-from assistant.tools.base import Tool, ToolArgs
+from assistant.tools.base import Tool, ToolArgs, ToolContext
 
 
 class ErrorCodeArgs(ToolArgs):
     code: str = Field(description="The error code from a failed transfer, as text, for example '214'.")
 
 
-# This tool never talks to ledger-core, so it ignores "client". It still takes one so every
+# This tool never talks to ledger-core, so it ignores "context". It still takes one so every
 # tool has the same shape and the registry can call them all the same way.
-async def lookup_error_code(client: LedgerClient, args: ErrorCodeArgs):
+async def lookup_error_code(context: ToolContext, args: ErrorCodeArgs):
     info = explain_error(args.code)
     if info is None:
         # Say plainly that we have nothing, so the model does not invent an explanation

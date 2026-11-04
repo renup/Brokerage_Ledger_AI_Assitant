@@ -2,8 +2,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from assistant.clients.ledger import LedgerClient
-from assistant.tools.base import Tool, ToolArgs
+from assistant.tools.base import Tool, ToolArgs, ToolContext
 
 
 # Notice: no customer id. The caller's token decides whose transfers these are.
@@ -19,12 +18,12 @@ class TransferStatusArgs(ToolArgs):
     transfer_id: int = Field(description="The id of one transfer, as returned by get_transfers.")
 
 
-async def get_transfers(client: LedgerClient, args: TransfersArgs):
-    return await client.transfers(args.status)
+async def get_transfers(context: ToolContext, args: TransfersArgs):
+    return await context.ledger.transfers(args.status)
 
 
-async def get_transfer_status(client: LedgerClient, args: TransferStatusArgs):
-    return await client.transfer(args.transfer_id)
+async def get_transfer_status(context: ToolContext, args: TransferStatusArgs):
+    return await context.ledger.transfer(args.transfer_id)
 
 
 TOOLS = [
