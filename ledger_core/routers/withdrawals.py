@@ -13,8 +13,8 @@ router = APIRouter(prefix="/me/withdrawals", tags=["withdrawals"])
 
 
 # Finds ONE withdrawal, but only if it belongs to this customer. Anything else is a 404.
-# (Same idea as get_transfer_owned_by_customer_or_404: someone else's id looks identical to one that doesn't exist.)
-def get_withdrawal_owned_by_customer_or_404(withdrawal_id: int, customer: Customer, session: Session) -> Withdrawal:
+# (Same idea as verify_transfer_ownership: someone else's id looks identical to one that doesn't exist.)
+def verify_withdrawal_ownership(withdrawal_id: int, customer: Customer, session: Session) -> Withdrawal:
     withdrawal = session.exec(
         select(Withdrawal)
         # A withdrawal has no customer_id, so we reach the owner through its account
@@ -78,7 +78,7 @@ def cancel_pending_withdrawal(
     session: Session = Depends(get_session),
 ):
     # Ownership check first: someone else's withdrawal is a 404
-    get_withdrawal_owned_by_customer_or_404(withdrawal_id, customer, session)
+    verify_withdrawal_ownership(withdrawal_id, customer, session)
 
     # Change it ONLY IF it is still pending, in one statement (a compare-and-set). If the
     # withdrawal completed a moment ago, no row matches and nothing is changed.
