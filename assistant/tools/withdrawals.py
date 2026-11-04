@@ -7,7 +7,7 @@ from assistant.tools.base import Tool, ToolArgs, ToolContext
 
 # Notice: no customer id. The caller's token decides whose withdrawals these are.
 class WithdrawalsArgs(ToolArgs):
-    status: Literal["pending", "completed", "failed", "all"] = Field(
+    status: Literal["pending", "completed", "failed", "cancelled", "all"] = Field(
         default="all",
         description="Which withdrawals to list. Use 'all' unless the customer names a status. "
         "Use 'pending' only when they ask about withdrawals still in progress, "

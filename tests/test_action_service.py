@@ -24,10 +24,12 @@ def empty_tables():
 
 # A fake ledger-core: one transfer whose status a test can change, and a record of retries made
 class FakeLedger:
-    def __init__(self, status="failed", down=False):
+    def __init__(self, status="failed", down=False, pending_withdrawal_ids=(3,)):
         self.status = status
         self.down = down
         self.retries = []
+        self.pending_withdrawal_ids = list(pending_withdrawal_ids)
+        self.cancellations = []
 
     async def transfer(self, transfer_id):
         if self.down:
@@ -36,6 +38,16 @@ class FakeLedger:
             "id": transfer_id, "status": self.status, "direction": "in",
             "account_type": "IRA", "other_broker": "Fidelity",
         }
+
+    async def withdrawals(self, status="all"):
+        if self.down:
+            raise LedgerUnavailableError("down")
+        return [{"id": i, "amount": 1200.0, "bank": "Chase", "status": "pending"} for i in self.pending_withdrawal_ids]
+
+    async def cancel_withdrawal(self, withdrawal_id):
+        self.cancellations.append(withdrawal_id)
+        self.pending_withdrawal_ids.remove(withdrawal_id)
+        return {"id": withdrawal_id, "status": "cancelled"}
 
     async def retry_transfer(self, transfer_id):
         self.retries.append(transfer_id)
@@ -143,3 +155,29 @@ def test_rejecting_then_approving_is_refused(db):
         asyncio.run(service.approve_proposal(proposal.action_id, "maya"))
     assert ledger.retries == []
     assert service.list_open_proposals("maya") == []
+
+
+def propose_cancellation(service, withdrawal_id=3, owner="maya"):
+    return service.create_proposal(
+        "s1", owner, ActionKind.CANCEL_WITHDRAWAL, {"withdrawal_id": withdrawal_id}, "Cancel your $1,200.00 withdrawal to Chase"
+    )
+
+
+def test_approving_a_cancellation_cancels_the_withdrawal_once(db):
+    ledger = FakeLedger()
+    service = service_for(db, ledger)
+    proposal = propose_cancellation(service)
+    done = asyncio.run(service.approve_proposal(proposal.action_id, "maya"))
+    assert done.status == ActionStatus.EXECUTED
+    assert ledger.cancellations == [3]
+
+
+def test_a_cancellation_is_not_run_if_the_withdrawal_is_no_longer_pending(db):
+    # Between the proposal and the approval the withdrawal completed, so it is no longer pending
+    ledger = FakeLedger(pending_withdrawal_ids=())
+    service = service_for(db, ledger)
+    proposal = propose_cancellation(service)
+    done = asyncio.run(service.approve_proposal(proposal.action_id, "maya"))
+    assert done.status == ActionStatus.FAILED
+    assert "no longer pending" in json.loads(done.result_json)["reason"]
+    assert ledger.cancellations == []
