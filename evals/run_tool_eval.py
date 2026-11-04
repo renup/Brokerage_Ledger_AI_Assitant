@@ -26,7 +26,8 @@ REGISTRY = ToolRegistry(ALL_TOOLS)
 TOOLS_BY_NAME = {tool.name: tool for tool in ALL_TOOLS}
 
 
-# One JSON object per line: {"id", "category", "question", "expected_tools", "expected_args"}
+# One JSON object per line: {"id", "category", "question", "expected_tools", "expected_args"},
+# plus optional "history" and optional "alternatives": [{"tools": [...], "args": {...}}]
 def load_cases(path: Path) -> list[dict]:
     with open(path, encoding="utf-8") as f:
         return [json.loads(line) for line in f if line.strip()]
@@ -94,21 +95,37 @@ def normalized_args(call: ToolCall) -> dict | None:
         return None
 
 
-# Compares what the model did with what we expected, for one question
-def score_case(case: dict, calls: list[ToolCall], words: str) -> dict:
-    called = {call.name: call for call in calls}
+# Checks one acceptable answer (a set of tools, and optionally the arguments each must have) against
+# what the model did. Returns (choice_ok, args_ok); args_ok is None when no arguments are listed.
+def check_expectation(expected_tools: list[str], expected_args: dict, called: dict[str, ToolCall]) -> tuple[bool, bool | None]:
     # Right tools means exactly the expected set: none missing, none extra
-    choice_ok = set(called) == set(case["expected_tools"])
+    choice_ok = set(called) == set(expected_tools)
 
-    # Only questions that list expected_args are checked on arguments (None = not applicable)
+    # Only answers that list expected_args are checked on arguments (None = not applicable)
     args_ok = None
-    if case["expected_args"]:
+    if expected_args:
         args_ok = choice_ok
-        for name, expected in case["expected_args"].items():
+        for name, expected in expected_args.items():
             actual = normalized_args(called[name]) if name in called else None
             # Every argument we listed must match; extra arguments the model added are ignored
             if actual is None or any(actual.get(key) != value for key, value in expected.items()):
                 args_ok = False
+    return choice_ok, args_ok
+
+
+# Compares what the model did with what we expected, for one question.
+# A case has one main answer ("expected_tools") and, optionally, "alternatives": other answers that
+# are just as correct (for example looking up an error code directly instead of the whole transfer).
+# The model passes if it matches ANY of them.
+def score_case(case: dict, calls: list[ToolCall], words: str) -> dict:
+    called = {call.name: call for call in calls}
+
+    main = {"tools": case["expected_tools"], "args": case["expected_args"]}
+    acceptable = [main] + case.get("alternatives", [])
+    checks = [check_expectation(a["tools"], a.get("args", {}), called) for a in acceptable]
+    # The first answer it fully matches; if none, report against the main answer
+    matched = next((i for i, (choice_ok, args_ok) in enumerate(checks) if choice_ok and args_ok is not False), None)
+    choice_ok, args_ok = checks[matched if matched is not None else 0]
 
     return {
         "id": case["id"],
@@ -119,7 +136,9 @@ def score_case(case: dict, calls: list[ToolCall], words: str) -> dict:
         "called_args": {name: normalized_args(call) for name, call in called.items()},
         "choice_ok": choice_ok,
         "args_ok": args_ok,
-        "passed": choice_ok and args_ok is not False,
+        # 0 = the main answer, 1+ = an alternative, None = no match (shown in the saved report)
+        "matched_answer": matched,
+        "passed": matched is not None,
         "reply_text": words[:300],  # the model's first 300 characters, to see WHY a case failed
     }
 

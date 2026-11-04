@@ -139,9 +139,11 @@ Tools: `get_accounts`, `get_withdrawals`, `get_transfers`, `get_transfer_status`
 uv run python -m evals.run_tool_eval                                        # main set
 uv run python -m evals.run_tool_eval --dataset evals/tools_hard.jsonl --runs 2
 uv run python -m evals.run_tool_eval --dataset evals/tools_multiturn.jsonl  # follow-up questions with history
+uv run python -m evals.run_tool_eval --dataset evals/tools_propose.jsonl     # propose-only tools (approval flow)
 ```
 
 - `--runs N` asks each question N times; a question that passes only some of the time is labelled FLAKY. `--min-score` sets the pass mark (exit code 1 below it, for CI).
+- A case has one main answer (`expected_tools`) and may list `alternatives`: other answers that are just as correct (for example looking up an error code directly instead of the whole transfer). The model passes if it matches any of them.
 - Reports are written to `evals/results/latest.json`, including what the model said, so failures can be diagnosed.
 - Tune on the main, hard and multi-turn sets. The `*_holdout.jsonl` sets are for checking a fix on wording it was never tuned on, so run them sparingly.
 - `LLM_TEMPERATURE=0` keeps tool choice steady and the scores meaningful.
