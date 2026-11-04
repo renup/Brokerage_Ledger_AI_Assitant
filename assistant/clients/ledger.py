@@ -64,3 +64,8 @@ class LedgerClient:
     # ledger-core answers 409 if the transfer is not in the failed state.
     async def retry_transfer(self, transfer_id: int) -> dict:
         return await self._request("POST", f"/me/transfers/{transfer_id}/retry")
+
+    # Cancels a pending withdrawal. A POST, because it changes something.
+    # ledger-core answers 409 if the withdrawal is no longer pending.
+    async def cancel_withdrawal(self, withdrawal_id: int) -> dict:
+        return await self._request("POST", f"/me/withdrawals/{withdrawal_id}/cancel")

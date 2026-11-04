@@ -121,3 +121,49 @@ def test_tax_documents_can_be_filtered_by_year(client):
 def test_fees_and_tax_documents_need_a_token(client):
     assert client.get("/me/fees").status_code == 401
     assert client.get("/me/tax-documents").status_code == 401
+
+
+# The id of a customer's first withdrawal with the given status, found through the API itself
+def withdrawal_id_with_status(client, headers, status):
+    return client.get(f"/me/withdrawals?status={status}", headers=headers).json()[0]["id"]
+
+
+def test_cancelling_a_pending_withdrawal_marks_it_cancelled(client):
+    headers = login_headers(client, MAYA)
+    withdrawal_id = withdrawal_id_with_status(client, headers, "pending")
+    response = client.post(f"/me/withdrawals/{withdrawal_id}/cancel", headers=headers)
+    assert response.status_code == 200
+    assert response.json() == {"id": withdrawal_id, "status": "cancelled"}
+    # It no longer counts as pending, and can be found under "cancelled"
+    assert client.get("/me/withdrawals?status=pending", headers=headers).json() == []
+    assert [w["id"] for w in client.get("/me/withdrawals?status=cancelled", headers=headers).json()] == [withdrawal_id]
+
+
+def test_cancelling_twice_gives_409(client):
+    headers = login_headers(client, MAYA)
+    withdrawal_id = withdrawal_id_with_status(client, headers, "pending")
+    assert client.post(f"/me/withdrawals/{withdrawal_id}/cancel", headers=headers).status_code == 200
+    assert client.post(f"/me/withdrawals/{withdrawal_id}/cancel", headers=headers).status_code == 409
+
+
+def test_a_completed_withdrawal_cannot_be_cancelled(client):
+    headers = login_headers(client, RENU)
+    withdrawal_id = withdrawal_id_with_status(client, headers, "completed")
+    assert client.post(f"/me/withdrawals/{withdrawal_id}/cancel", headers=headers).status_code == 409
+    # And it is unchanged
+    assert client.get("/me/withdrawals?status=completed", headers=headers).json()[0]["id"] == withdrawal_id
+
+
+def test_cannot_cancel_someone_elses_withdrawal_or_a_missing_one(client):
+    maya_headers = login_headers(client, MAYA)
+    mayas_id = withdrawal_id_with_status(client, maya_headers, "pending")
+    # Renu tries to cancel Maya's withdrawal: 404, the same as an id that does not exist
+    renu_headers = login_headers(client, RENU)
+    assert client.post(f"/me/withdrawals/{mayas_id}/cancel", headers=renu_headers).status_code == 404
+    assert client.post("/me/withdrawals/99999/cancel", headers=maya_headers).status_code == 404
+    # Maya's is still pending
+    assert withdrawal_id_with_status(client, maya_headers, "pending") == mayas_id
+
+
+def test_cancel_needs_a_token(client):
+    assert client.post("/me/withdrawals/1/cancel").status_code == 401
