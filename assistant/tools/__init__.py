@@ -4,6 +4,7 @@ from assistant.tools import (
     cancellation_proposal,
     error_codes,
     fees,
+    legal_name_proposal,
     retry_proposal,
     tax_documents,
     transfers,
@@ -22,4 +23,5 @@ ALL_TOOLS = [
     *tax_documents.TOOLS,
     *retry_proposal.TOOLS,
     *cancellation_proposal.TOOLS,
+    *legal_name_proposal.TOOLS,
 ]

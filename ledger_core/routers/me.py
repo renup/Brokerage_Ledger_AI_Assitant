@@ -28,3 +28,10 @@ def update_profile(
     session.commit()
     session.refresh(customer)
     return customer
+
+
+# Full path: GET /me/profile. Lets the caller (and the assistant, acting for them) see the legal
+# name currently on file before proposing a change to it.
+@router.get("/profile", response_model=ProfilePublic)
+def my_profile(customer: Customer = Depends(get_current_customer)):
+    return customer
