@@ -30,6 +30,8 @@ class FakeLedger:
         self.retries = []
         self.pending_withdrawal_ids = list(pending_withdrawal_ids)
         self.cancellations = []
+        self.legal_name = "Maya R. Patel"
+        self.name_updates = []
 
     async def transfer(self, transfer_id):
         if self.down:
@@ -48,6 +50,16 @@ class FakeLedger:
         self.cancellations.append(withdrawal_id)
         self.pending_withdrawal_ids.remove(withdrawal_id)
         return {"id": withdrawal_id, "status": "cancelled"}
+
+    async def profile(self):
+        if self.down:
+            raise LedgerUnavailableError("down")
+        return {"id": 1, "name": "Maya Patel", "legal_name": self.legal_name}
+
+    async def update_legal_name(self, legal_name):
+        self.name_updates.append(legal_name)
+        self.legal_name = legal_name
+        return {"id": 1, "name": "Maya Patel", "legal_name": legal_name}
 
     async def retry_transfer(self, transfer_id):
         self.retries.append(transfer_id)
@@ -181,3 +193,30 @@ def test_a_cancellation_is_not_run_if_the_withdrawal_is_no_longer_pending(db):
     assert done.status == ActionStatus.FAILED
     assert "no longer pending" in json.loads(done.result_json)["reason"]
     assert ledger.cancellations == []
+
+
+def propose_name_change(service, new="Maya Rose Patel", previous="Maya R. Patel", owner="maya"):
+    return service.create_proposal(
+        "s1", owner, ActionKind.CHANGE_NAME, {"legal_name": new, "previous_legal_name": previous}, f"Change your legal name from {previous} to {new}"
+    )
+
+
+def test_approving_a_name_change_updates_the_name(db):
+    ledger = FakeLedger()
+    service = service_for(db, ledger)
+    proposal = propose_name_change(service)
+    done = asyncio.run(service.approve_proposal(proposal.action_id, "maya"))
+    assert done.status == ActionStatus.EXECUTED
+    assert ledger.name_updates == ["Maya Rose Patel"]
+
+
+def test_a_name_change_is_refused_if_the_name_changed_since_it_was_proposed(db):
+    ledger = FakeLedger()
+    service = service_for(db, ledger)
+    proposal = propose_name_change(service)
+    # Someone else changed the name between the proposal and the approval
+    ledger.legal_name = "Maya Q. Patel"
+    done = asyncio.run(service.approve_proposal(proposal.action_id, "maya"))
+    assert done.status == ActionStatus.FAILED
+    assert "has changed" in json.loads(done.result_json)["reason"]
+    assert ledger.name_updates == []

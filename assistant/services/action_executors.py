@@ -41,14 +41,30 @@ async def perform_withdrawal_cancellation(ledger: LedgerClient, params: dict) ->
     return await ledger.cancel_withdrawal(params["withdrawal_id"])
 
 
-# kind -> how to do it. Name change and cancel withdrawal get an entry here when their
-# ledger-core endpoints exist; the service itself will not change.
+# The name on file must still be the one we saw when we proposed. If it changed in between (the
+# customer edited it elsewhere, or support did), approving would overwrite a newer name with an
+# older plan, so we refuse.
+async def ensure_legal_name_is_unchanged_since_proposal(ledger: LedgerClient, params: dict) -> None:
+    profile = await ledger.profile()
+    if profile["legal_name"] != params["previous_legal_name"]:
+        raise ActionNotPossibleError("The legal name on file has changed since this was prepared, so it was not updated.")
+
+
+async def perform_legal_name_update(ledger: LedgerClient, params: dict) -> dict:
+    return await ledger.update_legal_name(params["legal_name"])
+
+
+# kind -> how to do it. A new kind of change gets an entry here (plus its ledger-core endpoint and
+# propose tool); the service itself does not change.
 EXECUTORS: dict[ActionKind, Executor] = {
     ActionKind.RETRY_TRANSFER: Executor(
         ensure_still_possible=ensure_transfer_is_still_failed, perform=retry_failed_transfer
     ),
     ActionKind.CANCEL_WITHDRAWAL: Executor(
         ensure_still_possible=ensure_withdrawal_is_still_pending, perform=perform_withdrawal_cancellation
+    ),
+    ActionKind.CHANGE_NAME: Executor(
+        ensure_still_possible=ensure_legal_name_is_unchanged_since_proposal, perform=perform_legal_name_update
     ),
 }
 

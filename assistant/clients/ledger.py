@@ -24,10 +24,10 @@ class LedgerClient:
         self.headers = {"Authorization": f"Bearer {token}"}
 
     # The one place a request is made, so timeouts and error handling exist exactly once
-    async def _request(self, method: str, path: str, params: dict | None = None):
+    async def _request(self, method: str, path: str, params: dict | None = None, json: dict | None = None):
         try:
             # timeout=2.0: give up after 2 seconds instead of making the customer wait
-            response = await self.http.request(method, path, headers=self.headers, params=params, timeout=2.0)
+            response = await self.http.request(method, path, headers=self.headers, params=params, json=json, timeout=2.0)
         except httpx.RequestError as exc:
             # "from exc" keeps the original network error attached for debugging
             raise LedgerUnavailableError("Could not reach ledger-core") from exc
@@ -69,3 +69,11 @@ class LedgerClient:
     # ledger-core answers 409 if the withdrawal is no longer pending.
     async def cancel_withdrawal(self, withdrawal_id: int) -> dict:
         return await self._request("POST", f"/me/withdrawals/{withdrawal_id}/cancel")
+
+    # The profile on file: the display name and the legal name
+    async def profile(self) -> dict:
+        return await self._get("/me/profile")
+
+    # Changes the legal name on file. A PATCH, because it changes part of the profile.
+    async def update_legal_name(self, legal_name: str) -> dict:
+        return await self._request("PATCH", "/me/profile", json={"legal_name": legal_name})

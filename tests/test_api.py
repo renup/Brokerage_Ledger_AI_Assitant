@@ -167,3 +167,10 @@ def test_cannot_cancel_someone_elses_withdrawal_or_a_missing_one(client):
 
 def test_cancel_needs_a_token(client):
     assert client.post("/me/withdrawals/1/cancel").status_code == 401
+
+
+def test_my_profile_shows_the_legal_name_on_file_and_needs_a_token(client):
+    body = client.get("/me/profile", headers=login_headers(client, MAYA)).json()
+    assert body["legal_name"] == "Maya R. Patel"
+    assert "password_hash" not in body
+    assert client.get("/me/profile").status_code == 401
