@@ -71,6 +71,13 @@ class RetryResponse(BaseModel):
     id: int
     status: str
 
+
+# What the cancel endpoint answers with
+class CancelWithdrawalResponse(BaseModel):
+    id: int
+    status: str
+
+
 # What the caller sends to PATCH /me/profile
 class ProfileUpdate(BaseModel):
     # Trim leading and trailing spaces, so "  Maya  " is saved as "Maya"

@@ -13,7 +13,7 @@ router = APIRouter(prefix="/me/transfers", tags=["transfers"])
 
 # A helper used by two endpoints below. It finds ONE transfer, but only if it
 # belongs to this customer. Anything else is a 404.
-def get_my_transfer(transfer_id: int, customer: Customer, session: Session) -> Transfer:
+def get_transfer_owned_by_customer_or_404(transfer_id: int, customer: Customer, session: Session) -> Transfer:
     transfer = session.exec(
         select(Transfer)
         # A transfer has no customer_id, so we reach the owner through its account
@@ -59,7 +59,7 @@ def my_transfer(
     customer: Customer = Depends(get_current_customer),
     session: Session = Depends(get_session),
 ):
-    return get_my_transfer(transfer_id, customer, session)
+    return get_transfer_owned_by_customer_or_404(transfer_id, customer, session)
 
 
 # POST, because it changes something on the server
@@ -70,7 +70,7 @@ def retry_transfer(
     session: Session = Depends(get_session),
 ):
     # Same ownership check, so you can't retry someone else's transfer
-    transfer = get_my_transfer(transfer_id, customer, session)
+    transfer = get_transfer_owned_by_customer_or_404(transfer_id, customer, session)
     # 409 Conflict = "the request is fine, but it doesn't fit the current state"
     if transfer.status != "failed":
         raise HTTPException(status_code=409, detail="Only failed transfers can be retried")

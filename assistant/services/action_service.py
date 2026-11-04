@@ -58,7 +58,7 @@ class ActionService:
 
     # The customer says no. A lapsed proposal can still be rejected; there is nothing to protect.
     def reject_proposal(self, action_id: str, owner: str) -> PendingAction:
-        proposal = self._get_owned_proposal(action_id, owner)
+        proposal = self._get_proposal_owned_by_customer_or_raise_not_found(action_id, owner)
         now = datetime.now(timezone.utc)
         if not self.actions.transition(action_id, owner, ActionStatus.PROPOSED, ActionStatus.REJECTED, now):
             self.db.rollback()
@@ -75,7 +75,7 @@ class ActionService:
     #  3. re-check the world is still as it was when proposed
     #  4. do it, and record how it ended
     async def approve_proposal(self, action_id: str, owner: str) -> PendingAction:
-        proposal = self._get_owned_proposal(action_id, owner)
+        proposal = self._get_proposal_owned_by_customer_or_raise_not_found(action_id, owner)
         now = datetime.now(timezone.utc)
 
         # Friendly early answers. These are NOT the safety (the claim below is); they just give
@@ -100,7 +100,7 @@ class ActionService:
 
     # One of THIS customer's proposals, or NotFoundError (the same error for "no such id" and
     # "someone else's", so nobody can learn that another customer's proposal exists)
-    def _get_owned_proposal(self, action_id: str, owner: str) -> PendingAction:
+    def _get_proposal_owned_by_customer_or_raise_not_found(self, action_id: str, owner: str) -> PendingAction:
         proposal = self.actions.get_for_customer(action_id, owner)
         if proposal is None:
             raise NotFoundError("Proposal not found")
@@ -123,7 +123,7 @@ class ActionService:
     # The claim failed. Find out why so the customer gets the right message.
     # (NoReturn: this method always raises.)
     def _raise_why_claim_failed(self, action_id: str, owner: str, now: datetime) -> NoReturn:
-        proposal = self._get_owned_proposal(action_id, owner)
+        proposal = self._get_proposal_owned_by_customer_or_raise_not_found(action_id, owner)
         self.db.refresh(proposal)
         # Still "proposed" means we lost only because the 24 hours ran out in the last instant
         if proposal.status == ActionStatus.PROPOSED:
