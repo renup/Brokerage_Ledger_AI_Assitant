@@ -14,12 +14,16 @@ from assistant.database import new_session
 from assistant.errors import NotFoundError
 from assistant.models import Message
 from assistant.repositories.messages import MessageRepository
+from assistant.repositories.actions import ActionRepository
+from assistant.repositories.audit import AuditRepository
+from assistant.schemas import ProposalOut
+from assistant.services.action_service import ActionService
 from assistant.services.history import trim_to_budget
 from assistant.sse import sse
 
 from assistant.clients.ledger import LedgerClient
 from assistant.services.agent import ToolRound, ToolStarted, run_agent
-from assistant.tools.base import ToolContext
+from assistant.tools.base import ProposalSaver, ToolContext
 from assistant.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
@@ -76,18 +80,26 @@ class ChatService:
         message_id = str(uuid.uuid4())
         trace_id = str(uuid.uuid4())
 
+        # Proposals the tools save during this reply. They are announced to the app after each round.
+        created_proposals: list[ProposalOut] = []
+        context = ToolContext(self.ledger, self._proposal_saver(session_id, owner, created_proposals))
+
         parts = []
         # Each round of lookups the agent reports. Saved with the reply so later turns know the real ids.
         rounds = []
         try:
             # run_agent reports three kinds of event: words for the customer, "a tool is running", and a finished round of lookups
-            async for event in run_agent(messages, self.registry, ToolContext(self.ledger)):
+            async for event in run_agent(messages, self.registry, context):
                 if isinstance(event, ToolStarted):
                     # Lets the app show "Checking your account…" while the tool works
                     yield sse("tool", {"name": event.name})
                 elif isinstance(event, ToolRound):
                     # Not for the customer: kept so we can save it with the reply
                     rounds.append(event)
+                    # Any proposal saved in this round: tell the app to show its approval sheet
+                    for proposal in created_proposals:
+                        yield sse("approval_required", proposal.model_dump(mode="json"))
+                    created_proposals.clear()
                 else:
                     parts.append(event.text)
                     yield sse("token", {"text": event.text})
@@ -117,6 +129,20 @@ class ChatService:
     def _save_reply(self, reply: Message) -> None:
         with self.session_factory() as db:
             MessageRepository(db).add(reply)
+
+    # Builds the function the propose tools call to save a proposal. Like _save_reply it opens its
+    # OWN database session, because the request's session may be closed while the reply streams.
+    # "created" collects each saved proposal so stream_reply can tell the app about it.
+    def _proposal_saver(self, session_id: str, owner: str, created: list[ProposalOut]) -> ProposalSaver:
+        def save_proposal(kind, params, summary) -> ProposalOut:
+            with self.session_factory() as db:
+                service = ActionService(db, ActionRepository(db), AuditRepository(db), self.ledger)
+                # Turned into its public form INSIDE the "with", while the session is still open
+                proposal = ProposalOut.from_action(service.create_proposal(session_id, owner, kind, params, summary))
+            created.append(proposal)
+            return proposal
+
+        return save_proposal
 
     # A session's messages, oldest first. Empty means "no such session, or not yours".
     def get_history(self, session_id: str, owner: str) -> list[Message]:

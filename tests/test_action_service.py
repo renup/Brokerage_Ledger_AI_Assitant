@@ -32,7 +32,10 @@ class FakeLedger:
     async def transfer(self, transfer_id):
         if self.down:
             raise LedgerUnavailableError("down")
-        return {"id": transfer_id, "status": self.status}
+        return {
+            "id": transfer_id, "status": self.status, "direction": "in",
+            "account_type": "IRA", "other_broker": "Fidelity",
+        }
 
     async def retry_transfer(self, transfer_id):
         self.retries.append(transfer_id)
