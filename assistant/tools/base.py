@@ -1,5 +1,6 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
 
@@ -35,6 +36,18 @@ class ToolContext:
     propose: ProposalSaver | None = None
 
 
+# The kinds of help a customer message can need. The router picks the groups a message needs, and the
+# model is offered only the tools in those groups. A tool can belong to several groups (for example a
+# lookup that the "change" requests also need in order to find an id).
+class ToolGroup(StrEnum):
+    # Looking up the customer's own balances, withdrawals and transfers
+    ACCOUNT_DATA = "account"
+    # Fees, tax documents, what an error code means, how long something takes
+    REFERENCE = "reference"
+    # Asking for a change: retry a transfer, cancel a withdrawal, update the legal name
+    CHANGES = "change"
+
+
 # One tool the model may use. "frozen" means it can't be changed after creation.
 @dataclass(frozen=True)
 class Tool:
@@ -45,6 +58,8 @@ class Tool:
     args_model: type[ToolArgs]
     # Our code that does the work: receives the ToolContext and the validated arguments
     run: Callable[[ToolContext, ToolArgs], Awaitable[object]]
+    # Which kinds of help this tool belongs to. Required, so no tool can silently be left out of every menu.
+    groups: frozenset[ToolGroup]
 
     # The tool as the model sees it, in the standard "function" format that Ollama accepts.
     # The JSON schema is generated from the args model, so it can never drift from the validation.

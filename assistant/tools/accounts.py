@@ -1,4 +1,4 @@
-from assistant.tools.base import NoArgs, Tool, ToolContext
+from assistant.tools.base import NoArgs, Tool, ToolContext, ToolGroup
 
 
 # One call to ledger-core, as the caller. The caller's token decides whose accounts these are.
@@ -13,5 +13,6 @@ TOOLS = [
         "Use for questions about balances or which accounts they have.",
         args_model=NoArgs,
         run=get_accounts,
+        groups=frozenset({ToolGroup.ACCOUNT_DATA}),
     ),
 ]

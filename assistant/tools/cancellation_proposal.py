@@ -1,7 +1,7 @@
 from pydantic import Field
 
 from assistant.action_types import ActionKind
-from assistant.tools.base import Tool, ToolArgs, ToolContext
+from assistant.tools.base import Tool, ToolArgs, ToolContext, ToolGroup
 
 
 class ProposeWithdrawalCancellationArgs(ToolArgs):
@@ -48,5 +48,6 @@ TOOLS = [
         "Never tell the customer it has been cancelled.",
         args_model=ProposeWithdrawalCancellationArgs,
         run=propose_withdrawal_cancellation,
+        groups=frozenset({ToolGroup.CHANGES}),
     ),
 ]

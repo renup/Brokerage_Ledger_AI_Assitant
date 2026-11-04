@@ -1,6 +1,6 @@
 from pydantic import Field
 
-from assistant.tools.base import Tool, ToolArgs, ToolContext
+from assistant.tools.base import Tool, ToolArgs, ToolContext, ToolGroup
 
 
 class TaxDocumentsArgs(ToolArgs):
@@ -19,5 +19,6 @@ TOOLS = [
         "or where to find one. Do not use for general tax advice or how to file.",
         args_model=TaxDocumentsArgs,
         run=get_tax_documents,
+        groups=frozenset({ToolGroup.REFERENCE}),
     ),
 ]

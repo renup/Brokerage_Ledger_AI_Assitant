@@ -1,7 +1,7 @@
 from pydantic import Field
 
 from assistant.action_types import ActionKind
-from assistant.tools.base import Tool, ToolArgs, ToolContext
+from assistant.tools.base import Tool, ToolArgs, ToolContext, ToolGroup
 
 
 class ProposeLegalNameChangeArgs(ToolArgs):
@@ -54,5 +54,6 @@ TOOLS = [
         "Never tell the customer it has been changed.",
         args_model=ProposeLegalNameChangeArgs,
         run=propose_legal_name_change,
+        groups=frozenset({ToolGroup.CHANGES}),
     ),
 ]

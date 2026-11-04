@@ -1,4 +1,4 @@
-from assistant.tools.base import NoArgs, Tool, ToolContext
+from assistant.tools.base import NoArgs, Tool, ToolContext, ToolGroup
 
 
 async def get_fees(context: ToolContext, args: NoArgs):
@@ -14,5 +14,6 @@ TOOLS = [
         "Do not use for how much money is in an account.",
         args_model=NoArgs,
         run=get_fees,
+        groups=frozenset({ToolGroup.REFERENCE}),
     ),
 ]

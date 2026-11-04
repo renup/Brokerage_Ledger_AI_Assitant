@@ -3,7 +3,7 @@ from datetime import date
 from pydantic import Field
 
 from assistant.knowledge.business_days import add_business_days
-from assistant.tools.base import Tool, ToolArgs, ToolContext
+from assistant.tools.base import Tool, ToolArgs, ToolContext, ToolGroup
 
 
 class EstimateArrivalArgs(ToolArgs):
@@ -32,5 +32,6 @@ TOOLS = [
         "For a withdrawal the customer already made, use get_withdrawals instead.",
         args_model=EstimateArrivalArgs,
         run=estimate_arrival,
+        groups=frozenset({ToolGroup.ACCOUNT_DATA, ToolGroup.REFERENCE}),
     ),
 ]

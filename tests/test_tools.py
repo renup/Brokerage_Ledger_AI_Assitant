@@ -1,7 +1,7 @@
 import asyncio
 import json
 
-from assistant.tools.base import NoArgs, Tool, ToolContext
+from assistant.tools.base import NoArgs, Tool, ToolContext, ToolGroup
 
 from assistant.clients.ledger import LedgerRejectedError, LedgerUnavailableError
 from assistant.tools import ALL_TOOLS
@@ -105,7 +105,7 @@ def test_a_tool_that_takes_too_long_is_cut_off_with_a_readable_error():
     async def very_slow(context, args):
         await asyncio.sleep(5)
 
-    slow = Tool(name="slow", description="never finishes in time", args_model=NoArgs, run=very_slow)
+    slow = Tool(name="slow", description="never finishes in time", args_model=NoArgs, run=very_slow, groups=frozenset({ToolGroup.ACCOUNT_DATA}))
     quick_timeout = ToolRegistry([slow], timeout=0.05)
     result = json.loads(asyncio.run(quick_timeout.execute(FakeLedger(), "slow", "{}")))
     assert "took too long" in result["error"]
@@ -131,3 +131,25 @@ def test_tax_documents_year_is_optional_and_checked():
     assert ledger.calls == [("tax_documents", None)]
     assert "error" in run(ledger, "get_tax_documents", '{"year": 1850}')
     assert len(ledger.calls) == 1
+
+
+# The menus the router can offer: small, and every tool is reachable through at least one group
+def test_every_tool_belongs_to_a_group_and_every_group_has_a_small_menu():
+    assert all(tool.groups for tool in ALL_TOOLS)
+    for group in ToolGroup:
+        menu = registry.restricted_to({group}).tool_names()
+        assert 3 <= len(menu) <= 6, (group, menu)
+
+
+def test_a_restricted_registry_offers_and_runs_only_its_tools():
+    narrowed = registry.restricted_to({ToolGroup.REFERENCE})
+    assert "get_fees" in narrowed.tool_names()
+    assert "propose_retry_transfer" not in narrowed.tool_names()
+    result = json.loads(asyncio.run(narrowed.execute(ToolContext(FakeLedger()), "propose_retry_transfer", '{"transfer_id": 1}')))
+    assert "No such tool" in result["error"]
+
+
+def test_changes_group_has_the_three_proposals_and_the_lookups_that_find_ids():
+    assert set(registry.restricted_to({ToolGroup.CHANGES}).tool_names()) == {
+        "get_withdrawals", "get_transfers", "propose_retry_transfer", "propose_withdrawal_cancellation", "propose_legal_name_change",
+    }

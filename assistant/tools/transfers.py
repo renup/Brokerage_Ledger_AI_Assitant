@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from assistant.tools.base import Tool, ToolArgs, ToolContext
+from assistant.tools.base import Tool, ToolArgs, ToolContext, ToolGroup
 
 
 # Notice: no customer id. The caller's token decides whose transfers these are.
@@ -35,6 +35,7 @@ TOOLS = [
         "Do not use for general questions about how transfers work.",
         args_model=TransfersArgs,
         run=get_transfers,
+        groups=frozenset({ToolGroup.ACCOUNT_DATA, ToolGroup.CHANGES}),
     ),
     Tool(
         name="get_transfer_status",
@@ -43,5 +44,6 @@ TOOLS = [
         "never ask the customer for an id.",
         args_model=TransferStatusArgs,
         run=get_transfer_status,
+        groups=frozenset({ToolGroup.ACCOUNT_DATA}),
     ),
 ]
