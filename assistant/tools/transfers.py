@@ -30,7 +30,7 @@ TOOLS = [
     Tool(
         name="get_transfers",
         description="List the customer's own account transfers to or from other brokers, with status and any error code. "
-        "Use for ANY question about the status or progress of one of their transfers, such as "
+        "Use to FIND a transfer when you do not yet know its id, such as "
         "'what's going on with my IRA transfer' or 'did my Fidelity transfer go through'. "
         "Do not use for general questions about how transfers work.",
         args_model=TransfersArgs,
@@ -40,8 +40,9 @@ TOOLS = [
     Tool(
         name="get_transfer_status",
         description="Get full details of ONE of the customer's own transfers, including the error message if it failed. "
-        "If the customer gives a transfer number, use it directly. Otherwise call get_transfers first to find the id; "
-        "never ask the customer for an id.",
+        "If the customer gives a transfer number, or the id is already known from earlier in the conversation "
+        "(a follow-up such as 'has anything changed on it since'), use it directly to get the current state. "
+        "Otherwise call get_transfers first to find the id; never ask the customer for an id.",
         args_model=TransferStatusArgs,
         run=get_transfer_status,
         groups=frozenset({ToolGroup.ACCOUNT_DATA}),

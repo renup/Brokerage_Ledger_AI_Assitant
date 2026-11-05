@@ -40,6 +40,9 @@ class FakeLedger:
     async def tax_documents(self, year=None):
         return await self._answer("tax_documents", year)
 
+    async def withdrawal_eligibility(self, amount, account_type=None):
+        return await self._answer("withdrawal_eligibility", amount, account_type)
+
 
 def run(ledger, name, arguments):
     return json.loads(asyncio.run(registry.execute(ToolContext(ledger), name, arguments)))
@@ -138,7 +141,7 @@ def test_every_tool_belongs_to_a_group_and_every_group_has_a_small_menu():
     assert all(tool.groups for tool in ALL_TOOLS)
     for group in ToolGroup:
         menu = registry.restricted_to({group}).tool_names()
-        assert 3 <= len(menu) <= 6, (group, menu)
+        assert 3 <= len(menu) <= 7, (group, menu)
 
 
 def test_a_restricted_registry_offers_and_runs_only_its_tools():
@@ -153,3 +156,17 @@ def test_changes_group_has_the_three_proposals_and_the_lookups_that_find_ids():
     assert set(registry.restricted_to({ToolGroup.CHANGES}).tool_names()) == {
         "get_withdrawals", "get_transfers", "propose_retry_transfer", "propose_withdrawal_cancellation", "propose_legal_name_change",
     }
+
+
+def test_eligibility_check_passes_the_amount_and_optional_account_type_to_ledger_core():
+    ledger = FakeLedger()
+    run(ledger, "check_withdrawal_eligibility", '{"amount": 500}')
+    run(ledger, "check_withdrawal_eligibility", '{"amount": 250.5, "account_type": "roth_ira"}')
+    assert ledger.calls == [("withdrawal_eligibility", 500, None), ("withdrawal_eligibility", 250.5, "roth_ira")]
+
+
+def test_eligibility_check_rejects_bad_arguments_before_calling_ledger_core():
+    ledger = FakeLedger()
+    for bad in ('{"amount": 0}', '{"amount": -5}', '{}', '{"amount": 5, "account_type": "crypto"}', '{"amount": 5, "customer_id": 2}'):
+        assert "error" in run(ledger, "check_withdrawal_eligibility", bad)
+    assert ledger.calls == []

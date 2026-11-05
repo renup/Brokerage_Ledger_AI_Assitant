@@ -45,6 +45,14 @@ class LedgerClient:
     async def withdrawals(self, status: str = "all") -> list[dict]:
         return await self._get("/me/withdrawals", params={"status": status})
 
+    # amount: dollars, as the customer said it. account_type: "individual", "roth_ira" or "traditional_ira";
+    # None means every account (the parameter is left out of the request).
+    async def withdrawal_eligibility(self, amount: float, account_type: str | None = None) -> list[dict]:
+        params = {"amount": amount}
+        if account_type is not None:
+            params["account_type"] = account_type
+        return await self._get("/me/withdrawals/eligibility", params=params)
+
     # status: a transfer status to filter by; None means all (the parameter is left out)
     async def transfers(self, status: str | None = None) -> list[dict]:
         return await self._get("/me/transfers", params={"status": status} if status else None)

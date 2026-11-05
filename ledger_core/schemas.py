@@ -115,3 +115,14 @@ class TaxDocumentPublic(BaseModel):
     status: str
     available_on: date
     download_path: str | None
+
+
+# Whether one account could make a withdrawal of the amount that was asked about. Dollars, not cents.
+class WithdrawalEligibilityPublic(BaseModel):
+    account_type: str
+    number_last4: str
+    eligible: bool
+    # Cash that could be withdrawn right now (balance minus pending withdrawals)
+    available_to_withdraw: float
+    # Why not, in plain words. Empty when eligible.
+    reasons: list[str]

@@ -42,3 +42,6 @@
 {"id": "neg-01", "category": "not account lookups", "question": "What is a 1099-B?", "expected_tools": [], "expected_args": {}}
 {"id": "neg-02", "category": "not account lookups", "question": "How do I report capital gains on my taxes?", "expected_tools": [], "expected_args": {}}
 {"id": "neg-03", "category": "not account lookups", "question": "How much cash is in my Roth IRA?", "expected_tools": ["get_accounts"], "expected_args": {}}
+{"id": "elig-01", "category": "eligibility", "question": "Can I withdraw $500?", "expected_tools": ["check_withdrawal_eligibility"], "expected_args": {"check_withdrawal_eligibility": {"amount": 500}}}
+{"id": "elig-02", "category": "eligibility", "question": "Could I take out $3,000 from my Roth IRA?", "expected_tools": ["check_withdrawal_eligibility"], "expected_args": {"check_withdrawal_eligibility": {"amount": 3000, "account_type": "roth_ira"}}}
+{"id": "elig-03", "category": "eligibility", "question": "Am I allowed to withdraw 40000 dollars right now?", "expected_tools": ["check_withdrawal_eligibility"], "expected_args": {"check_withdrawal_eligibility": {"amount": 40000}}}

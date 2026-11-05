@@ -8,6 +8,7 @@ from assistant.tools import (
     retry_proposal,
     tax_documents,
     transfers,
+    withdrawal_eligibility,
     withdrawals,
 )
 
@@ -16,6 +17,7 @@ from assistant.tools import (
 ALL_TOOLS = [
     *accounts.TOOLS,
     *withdrawals.TOOLS,
+    *withdrawal_eligibility.TOOLS,
     *transfers.TOOLS,
     *error_codes.TOOLS,
     *arrival_estimates.TOOLS,
