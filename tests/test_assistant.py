@@ -7,11 +7,12 @@ from sqlmodel import Session
 
 from assistant import llm
 from assistant.auth import get_current_user
-from assistant.dependencies import get_ledger_client
+from assistant.dependencies import get_ledger_client, get_tool_router
 from assistant.database import engine
 from assistant.main import app as assistant_app
 from assistant.models import Message
 from assistant.llm import ToolCall
+from tests.helpers import NoRouting
 from assistant.services.history import trim_to_budget
 
 MAYA = {"id": 1, "name": "Maya Patel", "email": "maya.patel@example.com"}
@@ -59,6 +60,7 @@ def client_as(ledger):
     def make(user):
         assistant_app.dependency_overrides[get_current_user] = lambda: user
         assistant_app.dependency_overrides[get_ledger_client] = lambda: ledger
+        assistant_app.dependency_overrides[get_tool_router] = lambda: NoRouting()
         return TestClient(assistant_app)
 
     yield make

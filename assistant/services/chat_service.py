@@ -20,10 +20,11 @@ from assistant.schemas import ProposalOut
 from assistant.services.action_service import ActionService
 from assistant.services.history import trim_to_budget
 from assistant.sse import sse
+from assistant.services.tool_router import ToolRouter
 
 from assistant.clients.ledger import LedgerClient
 from assistant.services.agent import ToolRound, ToolStarted, run_agent
-from assistant.tools.base import ProposalSaver, ToolContext
+from assistant.tools.base import ProposalSaver, ToolContext, HandoffRecorder
 from assistant.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
@@ -45,11 +46,13 @@ class ChatService:
         repo: MessageRepository,
         ledger: LedgerClient,
         registry: ToolRegistry,
+        router: ToolRouter,
         session_factory: Callable[[], Session] = new_session,
     ):
         self.repo = repo
         self.ledger = ledger
         self.registry = registry
+        self.router = router
         self.session_factory = session_factory
 
     # Step 1 of a chat turn, run during the request: check the session is allowed, save the
@@ -82,14 +85,16 @@ class ChatService:
 
         # Proposals the tools save during this reply. They are announced to the app after each round.
         created_proposals: list[ProposalOut] = []
-        context = ToolContext(self.ledger, self._proposal_saver(session_id, owner, created_proposals))
+        context = ToolContext(self.ledger, self._proposal_saver(session_id, owner, created_proposals), self._handoff_function_for_tools(session_id, owner))
 
         parts = []
         # Each round of lookups the agent reports. Saved with the reply so later turns know the real ids.
         rounds = []
         try:
             # run_agent reports three kinds of event: words for the customer, "a tool is running", and a finished round of lookups
-            async for event in run_agent(messages, self.registry, context):
+            # Offer the model only the tools this message needs (falls back to all of them)
+            registry = await self.router.registry_for_message(messages, self.registry)
+            async for event in run_agent(messages, registry, context):
                 if isinstance(event, ToolStarted):
                     # Lets the app show "Checking your account…" while the tool works
                     yield sse("tool", {"name": event.name})
@@ -143,6 +148,16 @@ class ChatService:
             return proposal
 
         return save_proposal
+
+    # Builds the function the hand-off tool calls. Like _proposal_saver it opens its own database session,
+    # so the tool never sees a database.
+    def _handoff_function_for_tools(self, session_id: str, owner: str) -> HandoffRecorder:
+        def hand_off_and_get_reference(reason: str) -> int:
+            with self.session_factory() as db:
+                service = ActionService(db, ActionRepository(db), AuditRepository(db), self.ledger)
+                return service.record_handoff_with_reference_number(session_id, owner, reason)
+
+        return hand_off_and_get_reference
 
     # A session's messages, oldest first. Empty means "no such session, or not yours".
     def get_history(self, session_id: str, owner: str) -> list[Message]:

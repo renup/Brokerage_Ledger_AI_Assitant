@@ -1,7 +1,7 @@
 from pydantic import Field
 
 from assistant.knowledge.error_codes import explain_error
-from assistant.tools.base import Tool, ToolArgs, ToolContext
+from assistant.tools.base import Tool, ToolArgs, ToolContext, ToolGroup
 
 
 class ErrorCodeArgs(ToolArgs):
@@ -26,5 +26,6 @@ TOOLS = [
         "with an error code. The code is shown in the transfer data; never ask the customer for it.",
         args_model=ErrorCodeArgs,
         run=lookup_error_code,
+        groups=frozenset({ToolGroup.ACCOUNT_DATA, ToolGroup.REFERENCE}),
     ),
 ]

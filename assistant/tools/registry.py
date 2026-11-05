@@ -5,7 +5,7 @@ import logging
 from pydantic import ValidationError
 
 from assistant.clients.ledger import LedgerRejectedError, LedgerUnavailableError
-from assistant.tools.base import Tool, ToolContext
+from assistant.tools.base import Tool, ToolContext, ToolGroup
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,16 @@ class ToolRegistry:
         # name -> Tool, for fast lookup when the model asks for one
         self._tools = {tool.name: tool for tool in tools}
         self._timeout = timeout
+
+    # A registry holding only the tools that belong to at least one of the given groups. Used after
+    # routing: the model is offered these tools AND can run only these, so a tool that was not
+    # offered cannot be called even if the model asks for it.
+    def restricted_to(self, groups: set[ToolGroup]) -> "ToolRegistry":
+        return ToolRegistry([tool for tool in self._tools.values() if tool.groups & groups], self._timeout)
+
+    # The names of the tools in this registry (for logs and evals)
+    def tool_names(self) -> list[str]:
+        return list(self._tools)
 
     # The list sent to the model with every request
     def definitions(self) -> list[dict]:

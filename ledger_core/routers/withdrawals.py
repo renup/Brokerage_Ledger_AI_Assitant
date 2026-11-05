@@ -1,13 +1,14 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import update
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import update, func
 from sqlmodel import Session, select
 
 from ledger_core.auth import get_current_customer
 from ledger_core.database import get_session
 from ledger_core.models import Account, Customer, LinkedBank, Withdrawal
-from ledger_core.schemas import CancelWithdrawalResponse, WithdrawalPublic
+from ledger_core.schemas import CancelWithdrawalResponse, WithdrawalPublic, WithdrawalEligibilityPublic
+from ledger_core.withdrawal_rules import available_to_withdraw_cents, find_reasons_withdrawal_is_blocked
 
 router = APIRouter(prefix="/me/withdrawals", tags=["withdrawals"])
 
@@ -93,3 +94,43 @@ def cancel_pending_withdrawal(
     if rows_changed != 1:
         raise HTTPException(status_code=409, detail="Only pending withdrawals can be cancelled")
     return CancelWithdrawalResponse(id=withdrawal_id, status="cancelled")
+
+
+# Full path: GET /me/withdrawals/eligibility?amount=500&account_type=roth_ira
+# Answers "could I withdraw this amount right now?" without changing anything. One result per account
+# (or just the one asked about), so a customer with two accounts sees both.
+@router.get("/eligibility", response_model=list[WithdrawalEligibilityPublic])
+def check_withdrawal_eligibility(
+    # Dollars, as the customer says it. gt=0 rejects zero and negatives with an automatic 422.
+    amount: float = Query(gt=0, le=1_000_000),
+    account_type: Literal["individual", "roth_ira", "traditional_ira"] | None = None,
+    customer: Customer = Depends(get_current_customer),
+    session: Session = Depends(get_session),
+):
+    # round(), because 19.99 * 100 is 1998.9999999999998 in floating point
+    amount_cents = round(amount * 100)
+
+    # Only this customer's own accounts, optionally narrowed to one type
+    query = select(Account).where(Account.customer_id == customer.id)
+    if account_type is not None:
+        query = query.where(Account.type == account_type)
+
+    results = []
+    for account in session.exec(query).all():
+        # How much pending withdrawals already claim from this account (0 when there are none)
+        pending_cents = session.exec(
+            select(func.coalesce(func.sum(Withdrawal.amount_cents), 0)).where(
+                Withdrawal.account_id == account.id, Withdrawal.status == "pending"
+            )
+        ).one()
+        reasons = find_reasons_withdrawal_is_blocked(account, pending_cents, amount_cents)
+        results.append(
+            WithdrawalEligibilityPublic(
+                account_type=account.type,
+                number_last4=account.number_last4,
+                eligible=not reasons,
+                available_to_withdraw=available_to_withdraw_cents(account, pending_cents) / 100,
+                reasons=reasons,
+            )
+        )
+    return results

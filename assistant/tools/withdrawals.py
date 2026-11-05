@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from assistant.tools.base import Tool, ToolArgs, ToolContext
+from assistant.tools.base import Tool, ToolArgs, ToolContext, ToolGroup
 
 
 # Notice: no customer id. The caller's token decides whose withdrawals these are.
@@ -26,5 +26,6 @@ TOOLS = [
         "of the expected total it is on. Use for questions like 'where is my withdrawal' or 'why is it pending'.",
         args_model=WithdrawalsArgs,
         run=get_withdrawals,
+        groups=frozenset({ToolGroup.ACCOUNT_DATA, ToolGroup.CHANGES}),
     ),
 ]

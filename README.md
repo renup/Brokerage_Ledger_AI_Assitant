@@ -91,7 +91,7 @@ The order is deliberate. The assistant needs account data before it can answer q
 | 2. Fake brokerage (`ledger-core`) | Done |
 | 3. Chat pipe | Done |
 | 4. Real AI model | Done: tokenizer notebook, local model via Ollama, system prompt, token-budgeted chat history, Postgres |
-| 5. Account answers | In progress: 11 of 14 tools are built (8 read-only and three propose-only: retry a failed transfer, cancel a pending withdrawal, update the legal name), with an agent loop, saved lookups for follow-up questions, tool-choice evals, and the approval flow behind it (proposals, approve and reject with 24 hour expiry and double-tap protection, an append-only audit log, and `GET /actions`, `POST /actions/{id}/approve`, `POST /actions/{id}/reject`, `GET /activity`). Still to do: withdrawal eligibility, human handoff, help-center search |
+| 5. Account answers | In progress: 13 of 14 tools are built (9 read-only, including a withdrawal-eligibility check whose rules live in ledger-core, and three propose-only: retry a failed transfer, cancel a pending withdrawal, update the legal name; plus a human hand-off that logs the request with a reference number), with an agent loop, saved lookups for follow-up questions, tool-choice evals, and the approval flow behind it (proposals, approve and reject with 24 hour expiry and double-tap protection, an append-only audit log, and `GET /actions`, `POST /actions/{id}/approve`, `POST /actions/{id}/reject`, `GET /activity`). Still to do: help-center search (needs RAG) |
 | 6, 7, 7B, 8, 11, 12 | Not started |
 
 ## Repository layout
@@ -124,10 +124,11 @@ The model never touches the data. It can only *ask* for a lookup; our code runs 
 
 1. The router identifies the customer from their token and hands over to `ChatService`.
 2. `ChatService` saves the message and builds the prompt: the system rules plus recent history, trimmed to a token budget. Lookups from the last two assistant replies are replayed, labelled as snapshots that may be out of date.
-3. The agent loop (`assistant/services/agent.py`) asks the model, offering the tool menu. If the model asks for tools, the registry validates the arguments, runs the calls in parallel with a 2 second limit, and returns the results labelled as data. This repeats for up to 3 rounds and 6 calls, then the model must answer.
-4. The answer streams to the client as server-sent events (`token`, `tool`, `done`, `error`) and is saved with its lookups.
+3. A short routing question to the same model (`assistant/services/tool_router.py`) picks which kinds of help the message needs (`account`, `reference`, `change` or `none`), using the last few messages so short follow-ups such as "cancel it" make sense. The model is then offered only those tools (3 to 6 instead of all of them), and only those can run. If routing fails, every tool is offered.
+4. The agent loop (`assistant/services/agent.py`) asks the model, offering that menu. If the model asks for tools, the registry validates the arguments, runs the calls in parallel with a 2 second limit, and returns the results labelled as data. This repeats for up to 3 rounds and 6 calls, then the model must answer.
+5. The answer streams to the client as server-sent events (`token`, `tool`, `approval_required`, `done`, `error`) and is saved with its lookups.
 
-Safety by design: no tool takes a customer id (the caller's token decides whose data it is), unknown arguments are rejected, tools are read-only, and text inside results is never treated as instructions.
+Safety by design: no tool takes a customer id (the caller's token decides whose data it is), unknown arguments are rejected, and text inside results is never treated as instructions. Most tools only read. The three propose tools can only save a proposal; nothing changes until the customer approves it with their own request (`POST /actions/{id}/approve`).
 
 Tools: `get_accounts`, `get_withdrawals`, `get_transfers`, `get_transfer_status`, `get_fees` and `get_tax_documents` (these six call ledger-core), `lookup_error_code` and `estimate_arrival` (pure code, so the model never does date arithmetic). To add a tool, write its module in `assistant/tools/` and add it to `ALL_TOOLS` in `assistant/tools/__init__.py`.
 
@@ -140,10 +141,12 @@ uv run python -m evals.run_tool_eval                                        # ma
 uv run python -m evals.run_tool_eval --dataset evals/tools_hard.jsonl --runs 2
 uv run python -m evals.run_tool_eval --dataset evals/tools_multiturn.jsonl  # follow-up questions with history
 uv run python -m evals.run_tool_eval --dataset evals/tools_propose.jsonl     # propose-only tools (approval flow)
+uv run python -m evals.run_tool_eval --no-router                           # offer every tool, as before routing existed
 ```
 
 - `--runs N` asks each question N times; a question that passes only some of the time is labelled FLAKY. `--min-score` sets the pass mark (exit code 1 below it, for CI).
 - A case has one main answer (`expected_tools`) and may list `alternatives`: other answers that are just as correct (for example looking up an error code directly instead of the whole transfer). The model passes if it matches any of them.
+- Evals route the way the app does. Each result records which tools were on offer, and `router_menu_ok` is how often the menu still contained what the case needed, which separates a routing mistake from a model mistake.
 - Reports are written to `evals/results/latest.json`, including what the model said, so failures can be diagnosed.
 - Tune on the main, hard and multi-turn sets. The `*_holdout.jsonl` sets are for checking a fix on wording it was never tuned on, so run them sparingly.
 - `LLM_TEMPERATURE=0` keeps tool choice steady and the scores meaningful.
