@@ -91,7 +91,7 @@ The order is deliberate. The assistant needs account data before it can answer q
 | 2. Fake brokerage (`ledger-core`) | Done |
 | 3. Chat pipe | Done |
 | 4. Real AI model | Done: tokenizer notebook, local model via Ollama, system prompt, token-budgeted chat history, Postgres |
-| 5. Account answers | In progress: 12 of 14 tools are built (9 read-only, including a withdrawal-eligibility check whose rules live in ledger-core, and three propose-only: retry a failed transfer, cancel a pending withdrawal, update the legal name), with an agent loop, saved lookups for follow-up questions, tool-choice evals, and the approval flow behind it (proposals, approve and reject with 24 hour expiry and double-tap protection, an append-only audit log, and `GET /actions`, `POST /actions/{id}/approve`, `POST /actions/{id}/reject`, `GET /activity`). Still to do: human handoff, help-center search |
+| 5. Account answers | In progress: 13 of 14 tools are built (9 read-only, including a withdrawal-eligibility check whose rules live in ledger-core, and three propose-only: retry a failed transfer, cancel a pending withdrawal, update the legal name; plus a human hand-off that logs the request with a reference number), with an agent loop, saved lookups for follow-up questions, tool-choice evals, and the approval flow behind it (proposals, approve and reject with 24 hour expiry and double-tap protection, an append-only audit log, and `GET /actions`, `POST /actions/{id}/approve`, `POST /actions/{id}/reject`, `GET /activity`). Still to do: help-center search (needs RAG) |
 | 6, 7, 7B, 8, 11, 12 | Not started |
 
 ## Repository layout

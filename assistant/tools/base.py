@@ -25,15 +25,20 @@ class NoArgs(ToolArgs):
 # The tool never sees a database; it can only call this.
 ProposalSaver = Callable[[ActionKind, dict, str], ProposalOut]
 
+# Records a hand-off to a human: (reason) -> a reference number. Like ProposalSaver, the tool never sees a database.
+HandoffRecorder = Callable[[str], int]
+
 
 # Everything a tool is allowed to use, built fresh for each customer message.
 #   ledger:  reads this customer's data from ledger-core, with their own token
 #   propose: saves a proposal. It is None where proposing makes no sense (e.g. in evals), and
 #            only the propose tools use it.
+#   hand_off: records a hand-off to a human. None where it makes no sense (e.g. in evals).
 @dataclass(frozen=True)
 class ToolContext:
     ledger: LedgerClient
     propose: ProposalSaver | None = None
+    hand_off: HandoffRecorder | None = None
 
 
 # The kinds of help a customer message can need. The router picks the groups a message needs, and the
@@ -46,6 +51,8 @@ class ToolGroup(StrEnum):
     REFERENCE = "reference"
     # Asking for a change: retry a transfer, cancel a withdrawal, update the legal name
     CHANGES = "change"
+    # The customer wants a person, or needs something no tool can do
+    HUMAN_HELP = "human"
 
 
 # One tool the model may use. "frozen" means it can't be changed after creation.

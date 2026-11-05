@@ -56,6 +56,21 @@ class ActionService:
     def list_activity(self, owner: str, limit: int = 50) -> list[AuditEntry]:
         return self.audit.list_for_customer(owner, limit)
 
+    # Records that the customer was handed to a human, and returns a reference number for them to quote.
+    # The reason is a short sentence from the model; nothing else about the conversation is stored here.
+    def record_handoff_with_reference_number(self, session_id: str, owner: str, reason: str) -> int:
+        entry = AuditEntry(
+            customer_id_hash=owner,
+            session_id=session_id,
+            actor=Actor.AGENT,
+            action=AuditAction.HANDOFF,
+            detail=f"Handed to a human: {reason}",
+        )
+        self.audit.add(entry)
+        self.db.commit()
+        # Read after the commit so the database-assigned id is filled in
+        return entry.id
+
     # The customer says no. A lapsed proposal can still be rejected; there is nothing to protect.
     def reject_proposal(self, action_id: str, owner: str) -> PendingAction:
         proposal = self._load_proposal_for_customer(action_id, owner)

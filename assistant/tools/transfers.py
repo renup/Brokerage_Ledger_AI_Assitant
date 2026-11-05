@@ -40,7 +40,7 @@ TOOLS = [
     Tool(
         name="get_transfer_status",
         description="Get full details of ONE of the customer's own transfers, including the error message if it failed. "
-        "If the customer gives a transfer number, or the id is already known from earlier in the conversation "
+        "If the customer gives a transfer number (in digits or words, so 'transfer seven' means 7), or the id is already known from earlier in the conversation "
         "(a follow-up such as 'has anything changed on it since'), use it directly to get the current state. "
         "Otherwise call get_transfers first to find the id; never ask the customer for an id.",
         args_model=TransferStatusArgs,

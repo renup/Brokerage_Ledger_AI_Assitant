@@ -45,3 +45,7 @@
 {"id": "elig-01", "category": "eligibility", "question": "Can I withdraw $500?", "expected_tools": ["check_withdrawal_eligibility"], "expected_args": {"check_withdrawal_eligibility": {"amount": 500}}}
 {"id": "elig-02", "category": "eligibility", "question": "Could I take out $3,000 from my Roth IRA?", "expected_tools": ["check_withdrawal_eligibility"], "expected_args": {"check_withdrawal_eligibility": {"amount": 3000, "account_type": "roth_ira"}}}
 {"id": "elig-03", "category": "eligibility", "question": "Am I allowed to withdraw 40000 dollars right now?", "expected_tools": ["check_withdrawal_eligibility"], "expected_args": {"check_withdrawal_eligibility": {"amount": 40000}}}
+{"id": "human-01", "category": "human hand-off", "question": "Can I talk to a real person?", "expected_tools": ["escalate_to_human"], "expected_args": {}}
+{"id": "human-02", "category": "human hand-off", "question": "I want to dispute a fee you charged me, this is ridiculous.", "expected_tools": ["escalate_to_human"], "expected_args": {}}
+{"id": "human-03", "category": "human hand-off", "question": "I need to close my account, who do I speak to?", "expected_tools": ["escalate_to_human"], "expected_args": {}}
+{"id": "human-04", "category": "not a hand-off", "question": "How long do ACATS transfers usually take?", "expected_tools": [], "expected_args": {}}

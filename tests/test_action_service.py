@@ -220,3 +220,14 @@ def test_a_name_change_is_refused_if_the_name_changed_since_it_was_proposed(db):
     assert done.status == ActionStatus.FAILED
     assert "has changed" in json.loads(done.result_json)["reason"]
     assert ledger.name_updates == []
+
+
+def test_a_handoff_is_logged_and_its_reference_number_finds_the_entry(db):
+    service = service_for(db, FakeLedger())
+    reference = service.record_handoff_with_reference_number("s1", "maya", "wants to dispute a fee")
+    [entry] = service.list_activity("maya")
+    assert entry.id == reference
+    assert (entry.action, entry.actor) == (AuditAction.HANDOFF, "agent")
+    assert entry.detail == "Handed to a human: wants to dispute a fee"
+    # Not shown to anyone else
+    assert service.list_activity("renu") == []

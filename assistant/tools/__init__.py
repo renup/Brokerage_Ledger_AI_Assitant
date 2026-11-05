@@ -10,6 +10,7 @@ from assistant.tools import (
     transfers,
     withdrawal_eligibility,
     withdrawals,
+    human_handoff,
 )
 
 # The one list of every tool the model may use. To add a tool: write its file, then add it here.
@@ -26,4 +27,5 @@ ALL_TOOLS = [
     *retry_proposal.TOOLS,
     *cancellation_proposal.TOOLS,
     *legal_name_proposal.TOOLS,
+    *human_handoff.TOOLS,
 ]
