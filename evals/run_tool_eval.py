@@ -18,11 +18,14 @@ from assistant.llm import ToolCall, stream_turn
 from assistant.models import Message
 from assistant.services.chat_service import system_prompt
 from assistant.services.history import trim_to_budget
+from assistant.services.tool_router import ToolRouter, router_prompt
 from assistant.tools import ALL_TOOLS
 from assistant.tools.registry import ToolRegistry
 
 # The same tool menu and the same system prompt the real app uses, so we test what customers get
 REGISTRY = ToolRegistry(ALL_TOOLS)
+# The same router the app uses, so evals measure routing and the model's tool choice together
+ROUTER = ToolRouter()
 TOOLS_BY_NAME = {tool.name: tool for tool in ALL_TOOLS}
 
 
@@ -71,18 +74,22 @@ def build_messages(case: dict) -> list[dict]:
     return [{"role": "system", "content": rules}] + history
 
 
-# Asks the model one question and returns the tools it asked for (an empty list = it answered in words)
-async def ask_model(case: dict) -> tuple[list[ToolCall], str]:
+# Asks the model one question, the way the app does: first the router narrows the menu, then the
+# model answers with only those tools on offer. Returns the tools it asked for (an empty list = it
+# answered in words), what it said, and the names of the tools that were on offer.
+async def ask_model(case: dict, use_router: bool = True) -> tuple[list[ToolCall], str, list[str]]:
+    messages = build_messages(case)
+    registry = await ROUTER.registry_for_message(messages, REGISTRY) if use_router else REGISTRY
     calls = []
     words = []
-    async for item in stream_turn(build_messages(case), REGISTRY.definitions()):
+    async for item in stream_turn(messages, registry.definitions()):
         # Tool requests are what we score; the words are kept as evidence
         if isinstance(item, ToolCall):
             calls.append(item)
         else:
             # Keep the words too; they are the evidence when a case fails
             words.append(item)
-    return calls, "".join(words)
+    return calls, "".join(words), registry.tool_names()
 
 
 # The arguments the model sent, cleaned up by the tool's own Pydantic class. That fills in
@@ -117,7 +124,7 @@ def check_expectation(expected_tools: list[str], expected_args: dict, called: di
 # A case has one main answer ("expected_tools") and, optionally, "alternatives": other answers that
 # are just as correct (for example looking up an error code directly instead of the whole transfer).
 # The model passes if it matches ANY of them.
-def score_case(case: dict, calls: list[ToolCall], words: str) -> dict:
+def score_case(case: dict, calls: list[ToolCall], words: str, offered: list[str] | None = None) -> dict:
     called = {call.name: call for call in calls}
 
     main = {"tools": case["expected_tools"], "args": case["expected_args"]}
@@ -126,6 +133,10 @@ def score_case(case: dict, calls: list[ToolCall], words: str) -> dict:
     # The first answer it fully matches; if none, report against the main answer
     matched = next((i for i, (choice_ok, args_ok) in enumerate(checks) if choice_ok and args_ok is not False), None)
     choice_ok, args_ok = checks[matched if matched is not None else 0]
+    # Was the right answer even possible? True when some acceptable answer used only tools that were on
+    # offer. A False here means the ROUTER left a needed tool out; a False "passed" with a True here
+    # means the MODEL chose badly. (None when no menu was recorded.)
+    menu_ok = None if offered is None else any(set(a["tools"]) <= set(offered) for a in acceptable)
 
     return {
         "id": case["id"],
@@ -138,6 +149,8 @@ def score_case(case: dict, calls: list[ToolCall], words: str) -> dict:
         "args_ok": args_ok,
         # 0 = the main answer, 1+ = an alternative, None = no match (shown in the saved report)
         "matched_answer": matched,
+        "offered_tools": offered,
+        "menu_ok": menu_ok,
         "passed": matched is not None,
         "reply_text": words[:300],  # the model's first 300 characters, to see WHY a case failed
     }
@@ -165,29 +178,31 @@ def summarize(results: list[dict]) -> dict:
         "arguments": percent(sum(r["args_ok"] for r in with_args), len(with_args)),
         # "How long does an IRA transfer take?" must NOT trigger an account lookup
         "no_tool_when_not_needed": percent(sum(r["choice_ok"] for r in no_tool), len(no_tool)),
+        # How often the routed menu still contained what the case needed (100 when routing is off)
+        "router_menu_ok": percent(sum(r["menu_ok"] is not False for r in results), len(results)),
     }
 
 
 # A short code that changes whenever the system prompt or the tool menu changes, saved in the report
 # so a score can always be traced back to exactly what was tested
 def fingerprint() -> str:
-    text = system_prompt() + json.dumps(REGISTRY.definitions(), sort_keys=True)
+    text = system_prompt() + router_prompt() + json.dumps(REGISTRY.definitions(), sort_keys=True)
     return hashlib.sha256(text.encode()).hexdigest()[:12]
 
 
 # Asks the model one question once and scores what it did
-async def one_try(case: dict) -> dict:
-    calls, words = await ask_model(case)
-    return score_case(case, calls, words)
+async def one_try(case: dict, use_router: bool) -> dict:
+    calls, words, offered = await ask_model(case, use_router)
+    return score_case(case, calls, words, offered)
 
 
 # Asks every question "runs" times. The model has some randomness, so one try proves little;
 # several tries show how reliable it is.
-async def run(cases: list[dict], runs: int) -> list[dict]:
+async def run(cases: list[dict], runs: int, use_router: bool = True) -> list[dict]:
     results = []
     for case in cases:
         # One scored result per try (a list built with await inside it works in an async function)
-        attempts = [await one_try(case) for _ in range(runs)]
+        attempts = [await one_try(case, use_router) for _ in range(runs)]
         results.extend(attempts)
 
         passes = sum(a["passed"] for a in attempts)
@@ -202,12 +217,13 @@ def main() -> int:
     parser.add_argument("--dataset", type=Path, default=Path(__file__).parent / "tools.jsonl")
     parser.add_argument("--min-score", type=float, default=80.0, help="fail (exit 1) if the overall score is lower")
     parser.add_argument("--limit", type=int, help="run only the first N cases")
+    parser.add_argument("--no-router", action="store_true", help="offer every tool to the model, as before routing existed")
     parser.add_argument("--runs", type=int, default=3, help="how many times to ask each question")
     options = parser.parse_args()
 
     # [: None] keeps everything, so --limit is optional
     cases = load_cases(options.dataset)[: options.limit]
-    results = asyncio.run(run(cases, options.runs))
+    results = asyncio.run(run(cases, options.runs, use_router=not options.no_router))
     scores = summarize(results)
 
     print("\n" + "\n".join(f"{name:<26}{value}" for name, value in scores.items()))

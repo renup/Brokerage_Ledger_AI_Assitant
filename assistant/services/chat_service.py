@@ -20,6 +20,7 @@ from assistant.schemas import ProposalOut
 from assistant.services.action_service import ActionService
 from assistant.services.history import trim_to_budget
 from assistant.sse import sse
+from assistant.services.tool_router import ToolRouter
 
 from assistant.clients.ledger import LedgerClient
 from assistant.services.agent import ToolRound, ToolStarted, run_agent
@@ -45,11 +46,13 @@ class ChatService:
         repo: MessageRepository,
         ledger: LedgerClient,
         registry: ToolRegistry,
+        router: ToolRouter,
         session_factory: Callable[[], Session] = new_session,
     ):
         self.repo = repo
         self.ledger = ledger
         self.registry = registry
+        self.router = router
         self.session_factory = session_factory
 
     # Step 1 of a chat turn, run during the request: check the session is allowed, save the
@@ -89,7 +92,9 @@ class ChatService:
         rounds = []
         try:
             # run_agent reports three kinds of event: words for the customer, "a tool is running", and a finished round of lookups
-            async for event in run_agent(messages, self.registry, context):
+            # Offer the model only the tools this message needs (falls back to all of them)
+            registry = await self.router.registry_for_message(messages, self.registry)
+            async for event in run_agent(messages, registry, context):
                 if isinstance(event, ToolStarted):
                     # Lets the app show "Checking your account…" while the tool works
                     yield sse("tool", {"name": event.name})

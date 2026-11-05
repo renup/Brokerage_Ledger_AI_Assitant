@@ -10,13 +10,14 @@ from sqlmodel import Session
 from assistant import llm
 from assistant.auth import get_current_user
 from assistant.database import engine
-from assistant.dependencies import get_ledger_client
+from assistant.dependencies import get_ledger_client, get_tool_router
 from assistant.llm import ToolCall
 from assistant.main import app as assistant_app
 from assistant.schemas import ProposalOut
 from assistant.tools import ALL_TOOLS
 from assistant.tools.base import ToolContext
 from assistant.tools.registry import ToolRegistry
+from tests.helpers import NoRouting
 from tests.test_action_service import FakeLedger
 from tests.test_assistant import MAYA, parse_sse
 
@@ -95,6 +96,7 @@ def test_chat_announces_the_proposal_with_an_approval_required_event(monkeypatch
     monkeypatch.setattr(llm, "stream_turn", propose_then_answer)
     assistant_app.dependency_overrides[get_current_user] = lambda: MAYA
     assistant_app.dependency_overrides[get_ledger_client] = lambda: ledger
+    assistant_app.dependency_overrides[get_tool_router] = lambda: NoRouting()
     try:
         client = TestClient(assistant_app)
         events = parse_sse(client.post("/chat", json={"session_id": "s1", "message": "retry my failed transfer"}).text)

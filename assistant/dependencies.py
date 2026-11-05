@@ -11,6 +11,7 @@ from assistant.repositories.messages import MessageRepository
 from assistant.repositories.actions import ActionRepository
 from assistant.repositories.audit import AuditRepository
 from assistant.services.chat_service import ChatService
+from assistant.services.tool_router import ToolRouter
 from assistant.services.action_service import ActionService
 from assistant.tools import ALL_TOOLS
 from assistant.tools.registry import ToolRegistry
@@ -43,12 +44,19 @@ def get_tool_registry() -> ToolRegistry:
     return ToolRegistry(ALL_TOOLS)
 
 
+# The router keeps no state, so one shared instance serves every request
+@lru_cache
+def get_tool_router() -> ToolRouter:
+    return ToolRouter()
+
+
 def get_chat_service(
     repo: MessageRepository = Depends(get_message_repo),
     ledger: LedgerClient = Depends(get_ledger_client),
     registry: ToolRegistry = Depends(get_tool_registry),
+    router: ToolRouter = Depends(get_tool_router),
 ) -> ChatService:
-    return ChatService(repo, ledger, registry)
+    return ChatService(repo, ledger, registry, router)
 
 
 # One ActionService per request: this request's database session, and a ledger client that
