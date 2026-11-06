@@ -1,0 +1,31 @@
+{"id": "hc-01", "question": "How long until my money reaches my bank after I withdraw?", "expected_source": "moving-money-to-your-bank.md", "expected_heading": "How long a withdrawal takes"}
+{"id": "hc-02", "question": "What's the most I can take out in one go?", "expected_source": "moving-money-to-your-bank.md", "expected_heading": "How much you can withdraw"}
+{"id": "hc-03", "question": "Why would a withdrawal get rejected?", "expected_source": "moving-money-to-your-bank.md", "expected_heading": "When a withdrawal is blocked"}
+{"id": "hc-04", "question": "Can I stop a payout I already asked for?", "expected_source": "moving-money-to-your-bank.md", "expected_heading": "Cancelling a withdrawal"}
+{"id": "hc-05", "question": "Is there a charge for wiring money out?", "expected_source": "moving-money-to-your-bank.md", "expected_heading": "Withdrawal fees"}
+{"id": "hc-06", "question": "How many days does bringing my account over from another firm take?", "expected_source": "transferring-an-account-in.md", "expected_heading": "How long a transfer takes"}
+{"id": "hc-07", "question": "What do the numbers like 214 mean when my transfer breaks?", "expected_source": "transferring-an-account-in.md", "expected_heading": "Why a transfer can fail"}
+{"id": "hc-08", "question": "My transfer didn't work, how do I get it going again?", "expected_source": "transferring-an-account-in.md", "expected_heading": "Fixing a failed transfer"}
+{"id": "hc-09", "question": "What do you charge if I leave and move to another broker?", "expected_source": "transferring-an-account-in.md", "expected_heading": "Moving an account out"}
+{"id": "hc-10", "question": "What does it cost to trade stocks?", "expected_source": "fees-and-charges.md", "expected_heading": "What we charge"}
+{"id": "hc-11", "question": "Do all accounts pay the same fees?", "expected_source": "fees-and-charges.md", "expected_heading": "Which fees apply to you"}
+{"id": "hc-12", "question": "What's the difference between a Roth and a traditional IRA?", "expected_source": "retirement-accounts.md", "expected_heading": "Roth IRA and traditional IRA"}
+{"id": "hc-13", "question": "Will I owe a penalty if I pull money out of my IRA?", "expected_source": "retirement-accounts.md", "expected_heading": "Taking money out of an IRA"}
+{"id": "hc-14", "question": "Is there a yearly cost for a retirement account?", "expected_source": "retirement-accounts.md", "expected_heading": "IRA fee"}
+{"id": "hc-15", "question": "Why can't I withdraw from my account, it says restricted?", "expected_source": "retirement-accounts.md", "expected_heading": "Restricted accounts"}
+{"id": "hc-16", "question": "What does a 1099-B show?", "expected_source": "tax-documents.md", "expected_heading": "Which forms you may receive"}
+{"id": "hc-17", "question": "When will my tax forms be ready?", "expected_source": "tax-documents.md", "expected_heading": "When forms are ready"}
+{"id": "hc-18", "question": "Where do I download my tax paperwork?", "expected_source": "tax-documents.md", "expected_heading": "Where to find yours"}
+{"id": "hc-19", "question": "Can you tell me how to report my gains on my tax return?", "expected_source": "tax-documents.md", "expected_heading": "Tax advice"}
+{"id": "hc-20", "question": "How do I fix the spelling of my name on my account?", "expected_source": "account-and-security.md", "expected_heading": "Changing your legal name"}
+{"id": "hc-21", "question": "Can my husband look at my account through you?", "expected_source": "account-and-security.md", "expected_heading": "Who can see your accounts"}
+{"id": "hc-22", "question": "How can I speak to a human?", "expected_source": "account-and-security.md", "expected_heading": "Talking to a person"}
+{"id": "hc-23", "question": "Does the assistant make changes on its own?", "expected_source": "account-and-security.md", "expected_heading": "Changes need your approval"}
+{"id": "off-01", "question": "Which stock should I buy right now?", "expected_source": null, "expected_heading": null}
+{"id": "off-02", "question": "What's the weather in Chicago today?", "expected_source": null, "expected_heading": null}
+{"id": "off-03", "question": "Write me a poem about the ocean.", "expected_source": null, "expected_heading": null}
+{"id": "off-04", "question": "How do I bake sourdough bread?", "expected_source": null, "expected_heading": null}
+{"id": "off-05", "question": "Who won the football game last night?", "expected_source": null, "expected_heading": null}
+{"id": "off-06", "question": "What is the capital of France?", "expected_source": null, "expected_heading": null}
+{"id": "off-07", "question": "Explain how cryptocurrency mining works.", "expected_source": null, "expected_heading": null}
+{"id": "off-08", "question": "Can you recommend a good movie?", "expected_source": null, "expected_heading": null}
