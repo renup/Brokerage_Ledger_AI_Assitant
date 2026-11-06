@@ -21,10 +21,13 @@ from assistant.services.action_service import ActionService
 from assistant.services.history import trim_to_budget
 from assistant.sse import sse
 from assistant.services.tool_router import ToolRouter
+from assistant.clients.embeddings import embed_texts_for_search
+from assistant.repositories.help_passages import HelpPassageRepository
+from assistant.services.help_center_service import HelpCenterService
 
 from assistant.clients.ledger import LedgerClient
 from assistant.services.agent import ToolRound, ToolStarted, run_agent
-from assistant.tools.base import ProposalSaver, ToolContext, HandoffRecorder
+from assistant.tools.base import ProposalSaver, ToolContext, HandoffRecorder, HelpSearcher
 from assistant.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
@@ -85,7 +88,12 @@ class ChatService:
 
         # Proposals the tools save during this reply. They are announced to the app after each round.
         created_proposals: list[ProposalOut] = []
-        context = ToolContext(self.ledger, self._proposal_saver(session_id, owner, created_proposals), self._handoff_function_for_tools(session_id, owner))
+        context = ToolContext(
+            self.ledger,
+            self._proposal_saver(session_id, owner, created_proposals),
+            self._handoff_function_for_tools(session_id, owner),
+            self._help_search_function_for_tools(),
+        )
 
         parts = []
         # Each round of lookups the agent reports. Saved with the reply so later turns know the real ids.
@@ -158,6 +166,17 @@ class ChatService:
                 return service.record_handoff_with_reference_number(session_id, owner, reason)
 
         return hand_off_and_get_reference
+
+    # Builds the function the help-center tool calls. Like the others it opens its own database session,
+    # so the tool never sees a database. The session stays open while the question is embedded (a fraction of a second).
+    def _help_search_function_for_tools(self) -> HelpSearcher:
+        async def look_up_passages_for_question(question: str) -> list[dict]:
+            with self.session_factory() as db:
+                service = HelpCenterService(db, HelpPassageRepository(db), embed_texts_for_search)
+                found = await service.find_relevant_passages(question)
+            return [{"article": f.article, "heading": f.heading, "text": f.text, "source": f.source} for f in found]
+
+        return look_up_passages_for_question
 
     # A session's messages, oldest first. Empty means "no such session, or not yours".
     def get_history(self, session_id: str, owner: str) -> list[Message]:
