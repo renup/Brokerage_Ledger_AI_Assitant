@@ -9,6 +9,7 @@ none - thanks, a greeting, small talk, a request for investment advice, or anyth
 
 Rules:
 - The conversation is shown oldest first. Decide for the LAST customer message, using the earlier messages to understand short ones such as "cancel it", "yes please" or "is it there yet?".
+- "What is a (tax form name)?" asks what the form is, so it is help. Only asking where the customer's own form is, or when it will be ready, is reference.
 - A message can need several kinds of help. Answer with all of them, for example "account, reference".
 - Asking whether something is done, delayed or failed is "account", even when it is short or misspelled.
 - A follow-up about something the customer already asked about, such as "any news on it?" or "what went wrong with that one?", is "account" only.
@@ -22,6 +23,7 @@ Examples:
 - "can I withdraw $500?" -> account
 - "what do you charge to close an account?" -> reference
 - "do I owe a fee for moving my money to another firm?" -> reference
+- "is there a yearly charge on a traditional IRA?" -> reference
 - "where is my 1099?" -> reference
 - "what does error 220 mean?" -> reference
 - "when will my withdrawal reach my bank?" -> account, reference
@@ -36,6 +38,9 @@ Examples:
 - "is there a limit on withdrawals?" -> help
 - "what is a 5498 form?" -> help
 - "what is a 1099-DIV used for?" -> help
+- "what is a 1099-B?" -> help
+- "what is a W-9 form?" -> help
+- "what does a 1099-INT show?" -> help
 - "how do I send money to my bank account?" -> help
 - "how long does it usually take to move an account over from another broker?" -> help
 - "what usually makes a transfer fail?" -> help
