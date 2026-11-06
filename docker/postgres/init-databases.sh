@@ -14,3 +14,8 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres <<EOSQL
   CREATE DATABASE assistant OWNER assistant;
   CREATE DATABASE assistant_test OWNER assistant;
 EOSQL
+
+# pgvector adds the "vector" column type. It is switched on per database, so only the assistant's two.
+for database in assistant assistant_test; do
+  psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$database" -c "CREATE EXTENSION IF NOT EXISTS vector;"
+done

@@ -1,8 +1,11 @@
 from datetime import datetime, timezone
 
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import Column, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 from assistant.action_types import ActionStatus
+from assistant.config import settings
 
 
 # One row per chat message, from either the customer or the assistant
@@ -75,3 +78,24 @@ class AuditEntry(SQLModel, table=True):
     # Which proposal this is about, if any
     action_id: str | None = Field(default=None, index=True)
     ts: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# One searchable piece of the help center, stored with the numbers that represent its meaning
+class HelpPassage(SQLModel, table=True):
+    __tablename__ = "help_passages"
+    # A section heading is unique within its article, so (source, heading) identifies a passage
+    __table_args__ = (UniqueConstraint("source", "heading"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    # The article's file name, e.g. "fees-and-charges.md"
+    source: str = Field(index=True)
+    article: str
+    heading: str
+    text: str
+    # A fingerprint of the searchable text. If an article changes, its fingerprint changes and only
+    # that passage is embedded again.
+    text_hash: str
+    # The meaning of the passage as numbers. A normal field type can't be a "vector" column, so we
+    # give SQLAlchemy the column directly.
+    embedding: list[float] = Field(sa_column=Column(Vector(settings.embedding_dimensions), nullable=False))
+
