@@ -42,6 +42,7 @@ Examples:
 - "what is a W-9 form?" -> help
 - "what does a 1099-INT show?" -> help
 - "how do I send money to my bank account?" -> help
+- "what hours is your support open?" -> help
 - "how long does it usually take to move an account over from another broker?" -> help
 - "what usually makes a transfer fail?" -> help
 - "which stock should I buy?" -> none

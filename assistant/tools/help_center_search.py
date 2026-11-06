@@ -30,7 +30,9 @@ async def search_help_center(context: ToolContext, args: HelpSearchArgs):
         "found": True,
         "passages": passages,
         "note": "Answer only from these passages, in plain words, and name the article each fact came from. "
-        "If they do not answer the question, say so.",
+        "These are the closest passages, not necessarily the right ones: use one only if it directly answers what was asked. "
+        "If none does, say you do not have that information and offer to connect the customer with a person. "
+        "Never add a detail, a number or a service that the passages do not state.",
     }
 
 
