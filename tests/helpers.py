@@ -9,5 +9,5 @@ def login_headers(client, email, password="demo1234"):
 # about something else (tools, memory, proposals) use it so the router's own model call does not
 # disturb their scripted model; the real router is tested in test_tool_router.py.
 class NoRouting:
-    async def registry_for_message(self, messages, registry):
-        return registry
+    async def choose_registry_and_groups(self, messages, registry):
+        return registry, None

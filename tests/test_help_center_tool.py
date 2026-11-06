@@ -116,3 +116,41 @@ def test_chat_searches_the_help_center_and_hands_the_passages_to_the_model(monke
     # The best match (the Fees passage) came back, not the tax or transfer ones
     assert "what fees cost" in tool_messages[0]["content"]
     assert "tax forms" not in tool_messages[0]["content"]
+
+
+# Offers only the help-center search and reports the help route, as the real router does for "how does X work?"
+class HelpRouting:
+    async def choose_registry_and_groups(self, messages, registry):
+        groups = {ToolGroup.HELP_CENTER}
+        return registry.restricted_to(groups), groups
+
+
+# The point of searching in code: the model here NEVER asks for the search, yet the passages still reach it,
+# and the lookup is saved with the reply for later turns.
+def test_on_the_help_route_the_search_runs_even_if_the_model_never_asks(monkeypatch):
+    embedder = FakeEmbedder()
+    with Session(engine) as db:
+        asyncio.run(HelpCenterService(db, HelpPassageRepository(db), embedder).index_help_center_articles(ARTICLES))
+    monkeypatch.setattr(chat_service, "embed_texts_for_search", embedder)
+
+    seen = []
+
+    async def only_answers(messages, tools=None):
+        seen.append(messages)
+        yield "Fees depend on the account."
+
+    monkeypatch.setattr(llm, "stream_turn", only_answers)
+    assistant_app.dependency_overrides[get_current_user] = lambda: MAYA
+    assistant_app.dependency_overrides[get_ledger_client] = lambda: FakeLedger()
+    assistant_app.dependency_overrides[get_tool_router] = lambda: HelpRouting()
+    try:
+        client = TestClient(assistant_app)
+        events = parse_sse(client.post("/chat", json={"session_id": "s2", "message": "what do fees cost?"}).text)
+    finally:
+        assistant_app.dependency_overrides.clear()
+
+    names = [name for name, _ in events]
+    assert "tool" in names and names[-1] == "done"
+    # The model was asked once, and already had the search result in front of it
+    assert len(seen) == 1
+    assert any(m["role"] == "tool" and "what fees cost" in m["content"] for m in seen[0])

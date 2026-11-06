@@ -18,7 +18,7 @@ from assistant.llm import ToolCall, stream_turn
 from assistant.models import Message
 from assistant.services.chat_service import system_prompt
 from assistant.services.history import trim_to_budget
-from assistant.services.tool_router import ToolRouter, router_prompt
+from assistant.services.tool_router import ToolRouter, required_calls_for, router_prompt
 from assistant.tools import ALL_TOOLS
 from assistant.tools.registry import ToolRegistry
 
@@ -74,15 +74,24 @@ def build_messages(case: dict) -> list[dict]:
     return [{"role": "system", "content": rules}] + history
 
 
+# An empty stand-in for the model's turn, used when our code already made the lookups
+async def _no_turn():
+    return
+    yield
+
+
 # Asks the model one question, the way the app does: first the router narrows the menu, then the
 # model answers with only those tools on offer. Returns the tools it asked for (an empty list = it
 # answered in words), what it said, and the names of the tools that were on offer.
 async def ask_model(case: dict, use_router: bool = True) -> tuple[list[ToolCall], str, list[str]]:
     messages = build_messages(case)
-    registry = await ROUTER.registry_for_message(messages, REGISTRY) if use_router else REGISTRY
-    calls = []
+    registry, groups = await ROUTER.choose_registry_and_groups(messages, REGISTRY) if use_router else (REGISTRY, None)
+    # Lookups the app's code runs itself (the help-center search): counted as called, and the model is not asked,
+    # exactly as in the app. Without the router there is no route, so nothing is required.
+    calls = required_calls_for(groups, messages) if use_router else []
     words = []
-    async for item in stream_turn(messages, registry.definitions()):
+    # With required lookups the model's first turn is the answer to their results, which this eval does not score
+    async for item in stream_turn(messages, registry.definitions()) if not calls else _no_turn():
         # Tool requests are what we score; the words are kept as evidence
         if isinstance(item, ToolCall):
             calls.append(item)

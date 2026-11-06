@@ -115,3 +115,29 @@ def test_more_than_the_limit_runs_only_the_limit_but_every_request_gets_an_answe
     # All 8 requests were answered; the last 2 were told "too many lookups"
     assert len(tool_messages) == MAX_TOOL_CALLS + 2
     assert all("Too many lookups" in m["content"] for m in tool_messages[MAX_TOOL_CALLS:])
+
+
+# Lookups our code decided on (required_calls) run in the first round WITHOUT asking the model; the model's
+# first turn is then already the answer to their results.
+def test_a_required_call_runs_without_asking_the_model_and_the_model_then_answers(monkeypatch):
+    registry = FakeRegistry()
+    required = ToolCall(id="r1", name="search_help_center", arguments='{"question": "what is a roth ira?"}')
+    calls = fake_model(monkeypatch, [["A Roth IRA is..."]])
+
+    async def run():
+        return [
+            event
+            async for event in run_agent(
+                [{"role": "user", "content": "what is a roth ira?"}], registry, context=None, required_calls=[required]
+            )
+        ]
+
+    events = asyncio.run(run())
+
+    assert registry.executed == [("search_help_center", '{"question": "what is a roth ira?"}')]
+    assert events[0] == ToolStarted("search_help_center")
+    assert any(isinstance(event, ToolRound) for event in events)
+    assert events[-1] == Token("A Roth IRA is...")
+    # The model was asked exactly once, and that one time it could already see the search result
+    assert len(calls) == 1
+    assert any(m["role"] == "tool" for m in calls[0][0])
