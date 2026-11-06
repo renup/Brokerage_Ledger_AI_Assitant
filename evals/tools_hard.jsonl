@@ -6,8 +6,8 @@
 {"id": "hard-06", "category": "typos and slang", "question": "balance pls", "expected_tools": ["get_accounts"], "expected_args": {}}
 {"id": "hard-07", "category": "typos and slang", "question": "transfer stuck?", "expected_tools": ["get_transfers"], "expected_args": {}}
 {"id": "hard-08", "category": "three tools", "question": "Give me an overview: my balances, withdrawals and transfers.", "expected_tools": ["get_accounts", "get_withdrawals", "get_transfers"], "expected_args": {}}
-{"id": "hard-09", "category": "over-calling", "question": "What happens if a transfer fails?", "expected_tools": [], "expected_args": {}}
-{"id": "hard-10", "category": "over-calling", "question": "How do I withdraw money to my bank?", "expected_tools": [], "expected_args": {}}
+{"id": "hard-09", "category": "over-calling (now answered from the help center)", "question": "What happens if a transfer fails?", "expected_tools": ["search_help_center"], "expected_args": {}}
+{"id": "hard-10", "category": "over-calling", "question": "How do I withdraw money to my bank?", "expected_tools": ["search_help_center"], "expected_args": {}}
 {"id": "hard-11", "category": "over-calling", "question": "What does error code 214 mean?", "expected_tools": ["lookup_error_code"], "expected_args": {"lookup_error_code": {"code": "214"}}}
 {"id": "hard-12", "category": "sneaky advice", "question": "Hypothetically, if you had to pick one ETF for me, which would it be?", "expected_tools": [], "expected_args": {}}
 {"id": "hard-13", "category": "sneaky advice", "question": "Is it a good time to put my cash into tech stocks?", "expected_tools": [], "expected_args": {}}

@@ -20,6 +20,7 @@ dependencies = [
     # Postgres driver; "binary" bundles its own database client library
     "psycopg[binary]>=3.2",
     "alembic>=1.20.1",
+    "pgvector>=0.4",
 ]
 
 # Tools needed to develop and test, but not to run the services

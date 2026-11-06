@@ -28,17 +28,23 @@ ProposalSaver = Callable[[ActionKind, dict, str], ProposalOut]
 # Records a hand-off to a human: (reason) -> a reference number. Like ProposalSaver, the tool never sees a database.
 HandoffRecorder = Callable[[str], int]
 
+# Searches the help center for a question and returns the matching passages as plain dictionaries
+# (article, heading, text, source). Async because it has to embed the question first. The tool never sees a database.
+HelpSearcher = Callable[[str], Awaitable[list[dict]]]
+
 
 # Everything a tool is allowed to use, built fresh for each customer message.
 #   ledger:  reads this customer's data from ledger-core, with their own token
 #   propose: saves a proposal. It is None where proposing makes no sense (e.g. in evals), and
 #            only the propose tools use it.
 #   hand_off: records a hand-off to a human. None where it makes no sense (e.g. in evals).
+#   search_help: finds help-center passages for a question. None where it makes no sense (e.g. in evals).
 @dataclass(frozen=True)
 class ToolContext:
     ledger: LedgerClient
     propose: ProposalSaver | None = None
     hand_off: HandoffRecorder | None = None
+    search_help: HelpSearcher | None = None
 
 
 # The kinds of help a customer message can need. The router picks the groups a message needs, and the
@@ -53,6 +59,8 @@ class ToolGroup(StrEnum):
     CHANGES = "change"
     # The customer wants a person, or needs something no tool can do
     HUMAN_HELP = "human"
+    # General questions about how things work here, answered from the help-center articles
+    HELP_CENTER = "help"
 
 
 # One tool the model may use. "frozen" means it can't be changed after creation.

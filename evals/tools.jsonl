@@ -17,11 +17,11 @@
 {"id": "tr-06", "category": "transfers", "question": "Give me the details of transfer number 12.", "expected_tools": ["get_transfer_status"], "expected_args": {"get_transfer_status": {"transfer_id": 12}}}
 {"id": "multi-01", "category": "compound", "question": "What's my cash balance, and where is my withdrawal?", "expected_tools": ["get_accounts", "get_withdrawals"], "expected_args": {}}
 {"id": "multi-02", "category": "compound", "question": "Do I have any pending withdrawals or failed transfers?", "expected_tools": ["get_withdrawals", "get_transfers"], "expected_args": {"get_withdrawals": {"status": "pending"}, "get_transfers": {"status": "failed"}}}
-{"id": "gen-01", "category": "general knowledge", "question": "What is a Roth IRA?", "expected_tools": [], "expected_args": {}}
-{"id": "gen-02", "category": "general knowledge", "question": "How long does an IRA transfer usually take?", "expected_tools": [], "expected_args": {}}
-{"id": "gen-03", "category": "general knowledge", "question": "What does a business day mean?", "expected_tools": [], "expected_args": {}}
-{"id": "gen-04", "category": "general knowledge", "question": "What's the difference between a Roth and a traditional IRA?", "expected_tools": [], "expected_args": {}}
-{"id": "gen-05", "category": "general knowledge", "question": "Why do transfers sometimes get rejected?", "expected_tools": [], "expected_args": {}}
+{"id": "gen-01", "category": "general knowledge (now answered from the help center)", "question": "What is a Roth IRA?", "expected_tools": ["search_help_center"], "expected_args": {}}
+{"id": "gen-02", "category": "general knowledge (now answered from the help center)", "question": "How long does an IRA transfer usually take?", "expected_tools": ["search_help_center"], "expected_args": {}}
+{"id": "gen-03", "category": "general knowledge (now answered from the help center)", "question": "What does a business day mean?", "expected_tools": ["search_help_center"], "expected_args": {}}
+{"id": "gen-04", "category": "general knowledge (now answered from the help center)", "question": "What's the difference between a Roth and a traditional IRA?", "expected_tools": ["search_help_center"], "expected_args": {}}
+{"id": "gen-05", "category": "general knowledge (now answered from the help center)", "question": "Why do transfers sometimes get rejected?", "expected_tools": ["search_help_center"], "expected_args": {}}
 {"id": "chat-01", "category": "small talk", "question": "Hi!", "expected_tools": [], "expected_args": {}}
 {"id": "chat-02", "category": "small talk", "question": "Thanks, that helps.", "expected_tools": [], "expected_args": {}}
 {"id": "safe-01", "category": "refusal", "question": "Which stock should I buy?", "expected_tools": [], "expected_args": {}}
@@ -32,15 +32,15 @@
 {"id": "err-03", "category": "error codes", "question": "Is error code 230 serious?", "expected_tools": ["lookup_error_code"], "expected_args": {"lookup_error_code": {"code": "230"}}}
 {"id": "est-01", "category": "arrival estimate", "question": "If I start a withdrawal today and it takes 3 business days, what date does it land?", "expected_tools": ["estimate_arrival"], "expected_args": {"estimate_arrival": {"business_days": 3}}}
 {"id": "est-02", "category": "arrival estimate", "question": "What's the arrival date for something that takes 2 business days, starting today?", "expected_tools": ["estimate_arrival"], "expected_args": {"estimate_arrival": {"business_days": 2}}}
-{"id": "est-03", "category": "arrival estimate", "question": "How many business days does a withdrawal usually take?", "expected_tools": [], "expected_args": {}}
+{"id": "est-03", "category": "arrival estimate (now answered from the help center)", "question": "How many business days does a withdrawal usually take?", "expected_tools": ["search_help_center"], "expected_args": {}}
 {"id": "fee-01", "category": "fees", "question": "How much does it cost to transfer my account to another broker?", "expected_tools": ["get_fees"], "expected_args": {}}
 {"id": "fee-02", "category": "fees", "question": "Is there a fee for wire withdrawals?", "expected_tools": ["get_fees"], "expected_args": {}}
 {"id": "fee-03", "category": "fees", "question": "Do I pay anything to keep my Roth IRA open?", "expected_tools": ["get_fees"], "expected_args": {}}
 {"id": "tax-01", "category": "tax documents", "question": "Is my 2025 1099 ready yet?", "expected_tools": ["get_tax_documents"], "expected_args": {"get_tax_documents": {"year": 2025}}}
 {"id": "tax-02", "category": "tax documents", "question": "Where can I download my tax forms?", "expected_tools": ["get_tax_documents"], "expected_args": {}}
 {"id": "tax-03", "category": "tax documents", "question": "Which tax documents do I have on file?", "expected_tools": ["get_tax_documents"], "expected_args": {}}
-{"id": "neg-01", "category": "not account lookups", "question": "What is a 1099-B?", "expected_tools": [], "expected_args": {}}
-{"id": "neg-02", "category": "not account lookups", "question": "How do I report capital gains on my taxes?", "expected_tools": [], "expected_args": {}}
+{"id": "neg-01", "category": "not account lookups (now answered from the help center)", "question": "What is a 1099-B?", "expected_tools": ["search_help_center"], "expected_args": {}}
+{"id": "neg-02", "category": "not account lookups", "question": "How do I report capital gains on my taxes?", "expected_tools": [], "expected_args": {}, "alternatives": [{"tools": ["search_help_center"], "args": {}}]}
 {"id": "neg-03", "category": "not account lookups", "question": "How much cash is in my Roth IRA?", "expected_tools": ["get_accounts"], "expected_args": {}}
 {"id": "elig-01", "category": "eligibility", "question": "Can I withdraw $500?", "expected_tools": ["check_withdrawal_eligibility"], "expected_args": {"check_withdrawal_eligibility": {"amount": 500}}}
 {"id": "elig-02", "category": "eligibility", "question": "Could I take out $3,000 from my Roth IRA?", "expected_tools": ["check_withdrawal_eligibility"], "expected_args": {"check_withdrawal_eligibility": {"amount": 3000, "account_type": "roth_ira"}}}
@@ -48,4 +48,4 @@
 {"id": "human-01", "category": "human hand-off", "question": "Can I talk to a real person?", "expected_tools": ["escalate_to_human"], "expected_args": {}}
 {"id": "human-02", "category": "human hand-off", "question": "I want to dispute a fee you charged me, this is ridiculous.", "expected_tools": ["escalate_to_human"], "expected_args": {}}
 {"id": "human-03", "category": "human hand-off", "question": "I need to close my account, who do I speak to?", "expected_tools": ["escalate_to_human"], "expected_args": {}}
-{"id": "human-04", "category": "not a hand-off", "question": "How long do ACATS transfers usually take?", "expected_tools": [], "expected_args": {}}
+{"id": "human-04", "category": "not a hand-off (now answered from the help center)", "question": "How long do ACATS transfers usually take?", "expected_tools": ["search_help_center"], "expected_args": {}}

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from assistant import llm
-from assistant.llm import tool_request_message, tool_result_message
+from assistant.llm import tool_request_message, tool_result_message, ToolCall
 from assistant.tools.base import ToolContext
 from assistant.tools.registry import ToolRegistry
 
@@ -50,8 +50,14 @@ class ToolRound:
 #   3. You do the lookups yourself and hand back the results.
 #   4. They read the results and answer (or ask for more lookups, up to a limit).
 # Each trip through the "for" loop below is one such round.
+#
+# required_calls: lookups our code has decided must happen first (see required_calls_for). The first round
+# runs them without asking the model, so the model cannot skip them.
 async def run_agent(
-    messages: list[dict], registry: ToolRegistry, context: ToolContext
+    messages: list[dict],
+    registry: ToolRegistry,
+    context: ToolContext,
+    required_calls: list[ToolCall] | None = None,
 ) -> AsyncIterator[Token | ToolStarted | ToolRound]:
     # Work on a copy, so tool calls and results don't leak into the caller's list
     conversation = list(messages)
@@ -65,11 +71,16 @@ async def run_agent(
         # Ask the model. Listen to everything it sends back: words go straight to the customer,
         # tool requests are collected until the model has finished this turn.
         tool_calls = []
-        async for item in llm.stream_turn(conversation, tools):
-            if isinstance(item, str):
-                yield Token(item)
-            else:
-                tool_calls.append(item)
+        if round_number == 0 and required_calls:
+            # Our code already decided these lookups must happen (e.g. a help-center search for "what is a
+            # Roth IRA?"), so the model is not asked: it just receives the results and writes the answer
+            tool_calls = list(required_calls)
+        else:
+            async for item in llm.stream_turn(conversation, tools):
+                if isinstance(item, str):
+                    yield Token(item)
+                else:
+                    tool_calls.append(item)
 
         # No tool requested means the model has answered in words: we are done
         if not tool_calls:

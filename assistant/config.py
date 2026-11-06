@@ -30,7 +30,14 @@ class Settings(BaseSettings):
     llm_tokenizer: str = "Qwen/Qwen2.5-7B-Instruct"
     # Most history tokens we replay to the model on one turn. Older messages are left out.
     history_token_budget: int = 6000
-    
+
+    # --- Help-center search (phase 6) ---
+    # The model that turns text into numbers (an embedding). Served by the same Ollama, under /v1/embeddings.
+    embedding_model: str = "nomic-embed-text"
+    # How many numbers that model produces per text. It is fixed by the model: changing the model
+    # means changing this, then re-embedding every passage.
+    embedding_dimensions: int = 768
+
     # extra="ignore": the shared .env also holds ledger-core's settings (JWT_SECRET etc.).
     # Without this, pydantic would reject them as unknown fields.
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

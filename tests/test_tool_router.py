@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,7 +11,7 @@ from assistant.auth import get_current_user
 from assistant.database import engine
 from assistant.dependencies import get_ledger_client
 from assistant.main import app as assistant_app
-from assistant.services.tool_router import ToolRouter, parse_groups, recent_conversation
+from assistant.services.tool_router import ToolRouter, parse_groups, recent_conversation, required_calls_for
 from assistant.tools import ALL_TOOLS
 from assistant.tools.base import ToolGroup
 from assistant.tools.registry import ToolRegistry
@@ -66,7 +67,10 @@ def fake_router_model(monkeypatch, answer=None, error=None):
 
 
 def route(messages=None):
-    return asyncio.run(ToolRouter().registry_for_message(messages or [{"role": "user", "content": "hi"}], registry))
+    chosen_registry, _ = asyncio.run(
+        ToolRouter().choose_registry_and_groups(messages or [{"role": "user", "content": "hi"}], registry)
+    )
+    return chosen_registry
 
 
 def test_a_clear_answer_narrows_the_menu(monkeypatch):
@@ -115,3 +119,20 @@ def test_the_chat_offers_the_main_model_only_the_routed_tools(monkeypatch):
     assert events[-1][0] == "done"
     assert len(offered) == 1
     assert set(offered[0]) == {"get_fees", "get_tax_documents", "lookup_error_code", "estimate_arrival"}
+
+
+def test_a_help_route_requires_the_help_search_with_the_customers_last_message():
+    messages = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "Hello"}, {"role": "user", "content": "What is a Roth IRA?"}]
+    calls = required_calls_for({ToolGroup.HELP_CENTER}, messages)
+    assert [c.name for c in calls] == ["search_help_center"]
+    assert json.loads(calls[0].arguments) == {"question": "What is a Roth IRA?"}
+
+
+@pytest.mark.parametrize("groups", [None, set(), {ToolGroup.ACCOUNT_DATA}, {ToolGroup.REFERENCE, ToolGroup.CHANGES}])
+def test_other_routes_require_no_lookups(groups):
+    assert required_calls_for(groups, [{"role": "user", "content": "show my accounts"}]) == []
+
+
+def test_a_very_long_message_is_cut_to_the_length_the_search_tool_accepts():
+    calls = required_calls_for({ToolGroup.HELP_CENTER}, [{"role": "user", "content": "x" * 1000}])
+    assert len(json.loads(calls[0].arguments)["question"]) == 300

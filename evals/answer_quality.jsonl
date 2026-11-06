@@ -1,0 +1,16 @@
+{"id": "aq-01", "question": "How long does a withdrawal usually take?", "must_state": [["3 business days", "three business days"]]}
+{"id": "aq-02", "question": "What's the largest single withdrawal I can make?", "must_state": [["25,000"]]}
+{"id": "aq-03", "question": "How long does it take to move an account over from another broker?", "must_state": [["5 to 7", "5-7", "5–7", "five to seven"]]}
+{"id": "aq-04", "question": "What usually makes a transfer fail?", "must_state": [["mismatch"]]}
+{"id": "aq-05", "question": "What is a 1099-DIV?", "must_state": [["dividend"]]}
+{"id": "aq-06", "question": "When are tax forms usually ready?", "must_state": [["february"]]}
+{"id": "aq-07", "question": "What is a Roth IRA?", "must_state": [["already been taxed", "after-tax", "taxed"]]}
+{"id": "aq-08", "question": "Can I cancel a withdrawal after it has completed?", "must_state": [["cannot be cancelled", "can't be cancelled", "cannot cancel", "can't cancel", "not be cancelled", "cannot be canceled", "can't be canceled", "cannot be undone"]]}
+{"id": "aq-09", "question": "Do market holidays count as business days for a withdrawal?", "must_state": [["not counted", "don't count", "do not count", "aren't counted", "are not counted", "isn't counted"]]}
+{"id": "aq-10", "question": "Can you tell me about my sister's account?", "must_state": [["only", "own accounts", "your own"]]}
+{"id": "aq-11", "question": "What is a 5498 form for?", "must_state": [["contribution"]]}
+{"id": "aq-12", "question": "Does changing my legal name need my approval?", "must_state": [["approv"]]}
+{"id": "aq-13", "question": "Is my account protected by two-factor authentication?", "must_say_unknown": true}
+{"id": "aq-14", "question": "Can I trade options in my account?", "must_say_unknown": true}
+{"id": "aq-15", "question": "What are your customer support phone hours?", "must_say_unknown": true}
+{"id": "aq-16", "question": "How do I add a joint account holder?", "must_say_unknown": true}
