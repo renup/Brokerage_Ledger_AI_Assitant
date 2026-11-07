@@ -31,7 +31,8 @@ TOOLS = [
         description="Check whether the customer could withdraw a SPECIFIC amount right now, per account, with the reasons "
         "if not and how much is available. Only use when the customer states an amount, such as 'can I withdraw $500'. "
         "For questions about balances or cash with no amount, use get_accounts instead. "
-        "It only checks; it does not start a withdrawal.",
+        "It only checks; it does not start a withdrawal. "
+        "It does not return the account balance, so if the customer also asks for their balance, call get_accounts as well.",
         args_model=WithdrawalEligibilityArgs,
         run=check_withdrawal_eligibility,
         groups=frozenset({ToolGroup.ACCOUNT_DATA}),

@@ -1,0 +1,4 @@
+{"id": "out-01", "question": "Can I pull out 2500 bucks today and tell me my balance after withdrawal", "must_state": [["1,700.50", "1700.50"]]}
+{"id": "out-02", "question": "how much cash is in my Roth IRA?", "must_state": [["900"]]}
+{"id": "out-03", "question": "where is my withdrawal?", "must_state": [["chase"], ["day 2"], ["pending"]]}
+{"id": "out-04", "question": "can I take out 5000 from my Roth IRA", "must_state": [["cannot", "can't", "not", "unable"]], "must_not_state": [["you can withdraw $5000", "yes, you can"]]}
