@@ -10,7 +10,9 @@ TOOLS = [
     Tool(
         name="get_accounts",
         description="List the customer's own brokerage accounts with type, last 4 digits, cash balance in dollars and status. "
-        "Use for questions about balances or which accounts they have.",
+        "Use for questions about balances or which accounts they have. It takes no arguments and always returns every "
+        "account; when the customer asks about one account (for example their Roth IRA), call it without arguments and "
+        "read that account's line from the result.",
         args_model=NoArgs,
         run=get_accounts,
         groups=frozenset({ToolGroup.ACCOUNT_DATA}),

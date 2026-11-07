@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from ledger_core.withdrawal_rules import (
     MAX_SINGLE_WITHDRAWAL_CENTS,
     available_to_withdraw_cents,
+    cash_balance_after_withdrawal_cents,
     find_reasons_withdrawal_is_blocked,
 )
 from tests.helpers import login_headers
@@ -27,6 +28,10 @@ def test_pending_withdrawals_reduce_what_is_available():
 
 def test_available_cash_is_never_negative():
     assert available_to_withdraw_cents(account(10_000), 50_000) == 0
+
+
+def test_balance_after_a_withdrawal_is_the_balance_minus_the_amount():
+    assert cash_balance_after_withdrawal_cents(account(420_050), 250_000) == 170_050
 
 
 def test_a_restricted_account_is_blocked():
@@ -87,3 +92,20 @@ def test_zero_negative_and_unknown_account_type_are_rejected(client):
 
 def test_eligibility_needs_a_token(client):
     assert client.get("/me/withdrawals/eligibility?amount=5").status_code == 401
+
+
+# $3,250.75 balance, $1,200.00 pending: the balance after is worked out from the BALANCE, not from what is available
+def test_an_allowed_withdrawal_reports_the_balance_now_and_after(client):
+    headers = login_headers(client, MAYA)
+    results = client.get("/me/withdrawals/eligibility?amount=500&account_type=individual", headers=headers).json()
+    assert results[0]["cash_balance"] == 3250.75
+    assert results[0]["cash_balance_after"] == 2750.75
+    assert results[0]["available_to_withdraw"] == 2050.75
+
+
+def test_a_blocked_withdrawal_has_no_balance_after(client):
+    headers = login_headers(client, MAYA)
+    results = client.get("/me/withdrawals/eligibility?amount=3000&account_type=individual", headers=headers).json()
+    assert results[0]["eligible"] is False
+    assert results[0]["cash_balance"] == 3250.75
+    assert results[0]["cash_balance_after"] is None

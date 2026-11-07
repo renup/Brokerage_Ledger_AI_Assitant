@@ -8,7 +8,11 @@ from ledger_core.auth import get_current_customer
 from ledger_core.database import get_session
 from ledger_core.models import Account, Customer, LinkedBank, Withdrawal
 from ledger_core.schemas import CancelWithdrawalResponse, WithdrawalPublic, WithdrawalEligibilityPublic
-from ledger_core.withdrawal_rules import available_to_withdraw_cents, find_reasons_withdrawal_is_blocked
+from ledger_core.withdrawal_rules import (
+    available_to_withdraw_cents,
+    cash_balance_after_withdrawal_cents,
+    find_reasons_withdrawal_is_blocked,
+)
 
 router = APIRouter(prefix="/me/withdrawals", tags=["withdrawals"])
 
@@ -130,6 +134,9 @@ def check_withdrawal_eligibility(
                 number_last4=account.number_last4,
                 eligible=not reasons,
                 available_to_withdraw=available_to_withdraw_cents(account, pending_cents) / 100,
+                # The balance as it stands, and what it would be after this withdrawal (only if it is allowed)
+                cash_balance=account.cash_balance_cents / 100,
+                cash_balance_after=None if reasons else cash_balance_after_withdrawal_cents(account, amount_cents) / 100,
                 reasons=reasons,
             )
         )

@@ -1,3 +1,3 @@
 {"id": "sealed-1", "category": "no tool", "question": "ok cool thanks", "expected_tools": [], "expected_args": {}}
-{"id": "sealed-2", "category": "two tools", "question": "Can I pull out 2500 bucks today and tell me my balance after withdrawal", "expected_tools": ["check_withdrawal_eligibility", "get_accounts"], "expected_args": {"check_withdrawal_eligibility": {"amount": 2500}}}
+{"id": "sealed-2", "category": "two tools", "question": "Can I pull out 2500 bucks today and tell me my balance after withdrawal", "expected_tools": ["check_withdrawal_eligibility"], "expected_args": {"check_withdrawal_eligibility": {"amount": 2500}}}
 {"id": "sealed-3", "category": "help_center", "question": "what does retirement account mean?", "expected_tools": ["search_help_center"], "expected_args": {}}

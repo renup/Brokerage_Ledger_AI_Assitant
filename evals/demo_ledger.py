@@ -14,11 +14,20 @@ class DemoLedger:
         ]
 
     async def withdrawal_eligibility(self, amount, account_type=None):
+        # Same fields as ledger-core's answer. available_to_withdraw is the cash minus pending withdrawals.
+        rows = [("individual", "1111", 4200.50, 3000.50), ("roth_ira", "2222", 900.00, 900.00)]
         return [
-            {"account_type": "individual", "number_last4": "1111", "eligible": amount <= 3000,
-             "available_to_withdraw": 3000.50, "reasons": [] if amount <= 3000 else ["More than the cash available"]},
-            {"account_type": "roth_ira", "number_last4": "2222", "eligible": amount <= 900,
-             "available_to_withdraw": 900.00, "reasons": [] if amount <= 900 else ["More than the cash available"]},
+            {
+                "account_type": kind,
+                "number_last4": last4,
+                "eligible": amount <= available,
+                "available_to_withdraw": available,
+                "cash_balance": cash,
+                "cash_balance_after": round(cash - amount, 2) if amount <= available else None,
+                "reasons": [] if amount <= available else [f"Only ${available:,.2f} is available after pending withdrawals."],
+            }
+            for kind, last4, cash, available in rows
+            if account_type is None or account_type == kind
         ]
 
     async def transfers(self, status=None):

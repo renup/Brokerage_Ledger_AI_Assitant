@@ -32,7 +32,8 @@ TOOLS = [
         "if not and how much is available. Only use when the customer states an amount, such as 'can I withdraw $500'. "
         "For questions about balances or cash with no amount, use get_accounts instead. "
         "It only checks; it does not start a withdrawal. "
-        "It does not return the account balance, so if the customer also asks for their balance, call get_accounts as well.",
+        "Each account in the result also shows its cash balance now and its balance after this withdrawal, "
+        "so a question like 'can I withdraw $500 and what will I have left' needs only this tool.",
         args_model=WithdrawalEligibilityArgs,
         run=check_withdrawal_eligibility,
         groups=frozenset({ToolGroup.ACCOUNT_DATA}),
