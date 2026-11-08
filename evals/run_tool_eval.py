@@ -205,6 +205,21 @@ async def one_try(case: dict, use_router: bool) -> dict:
     return score_case(case, calls, words, offered)
 
 
+# Shows, for every try that failed, what the model was given and what it did: the full question, the tools that were
+# on offer (a missing one means the ROUTER left it out), each tool it asked for with its arguments, and its words.
+def print_failed_attempts(case: dict, attempts: list[dict]) -> None:
+    print(f"        question: {case['question']}")
+    print(f"        acceptable answers: {[case['expected_tools']] + [a['tools'] for a in case.get('alternatives', [])]}")
+    for number, attempt in enumerate(attempts, start=1):
+        if attempt["passed"]:
+            continue
+        print(f"        try {number}: failed")
+        print(f"          tools on offer: {attempt['offered_tools']}")
+        print(f"          menu had what was needed: {attempt['menu_ok']}")
+        print(f"          tools asked for: {attempt['called_args'] or 'none'}")
+        print(f"          model said: {attempt['reply_text'] or '(nothing)'!r}")
+
+
 # Asks every question "runs" times. The model has some randomness, so one try proves little;
 # several tries show how reliable it is.
 async def run(cases: list[dict], runs: int, use_router: bool = True) -> list[dict]:
@@ -218,6 +233,9 @@ async def run(cases: list[dict], runs: int, use_router: bool = True) -> list[dic
         # All tries right = reliable. None right = broken. In between = flaky.
         label = "PASS " if passes == runs else "FAIL " if passes == 0 else "FLAKY"
         print(f"{label} {passes}/{runs}  {case['id']:<9} {case['question'][:44]:<44} expected={case['expected_tools']} got={[a['called_tools'] for a in attempts]}")
+        # For a case that did not always pass, show what happened in each failing try, so nobody has to ask for it
+        if passes < runs:
+            print_failed_attempts(case, attempts)
     return results
 
 
