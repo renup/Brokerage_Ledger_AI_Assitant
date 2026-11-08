@@ -124,5 +124,11 @@ class WithdrawalEligibilityPublic(BaseModel):
     eligible: bool
     # Cash that could be withdrawn right now (balance minus pending withdrawals)
     available_to_withdraw: float
+    # The account's cash right now, before any withdrawal. Not the same as available_to_withdraw: that one
+    # also subtracts pending withdrawals.
+    cash_balance: float
+    # The account's cash after THIS withdrawal, worked out here so nobody has to do the subtraction.
+    # None when the withdrawal would not be allowed, because then nothing would change.
+    cash_balance_after: float | None
     # Why not, in plain words. Empty when eligible.
     reasons: list[str]
