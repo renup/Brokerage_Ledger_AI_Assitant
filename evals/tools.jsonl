@@ -49,3 +49,5 @@
 {"id": "human-02", "category": "human hand-off", "question": "I want to dispute a fee you charged me, this is ridiculous.", "expected_tools": ["escalate_to_human"], "expected_args": {}}
 {"id": "human-03", "category": "human hand-off", "question": "I need to close my account, who do I speak to?", "expected_tools": ["escalate_to_human"], "expected_args": {}}
 {"id": "human-04", "category": "not a hand-off (now answered from the help center)", "question": "How long do ACATS transfers usually take?", "expected_tools": ["search_help_center"], "expected_args": {}}
+{"id": "fee-04", "category": "fees", "question": "How much fees do I pay on my taxable account?", "expected_tools": ["get_fees"], "expected_args": {}}
+{"id": "elig-04", "category": "eligibility", "question": "Can I move money out of my retirement account into my bank", "expected_tools": ["check_withdrawal_eligibility"], "expected_args": {}, "alternatives": [{"tools": ["get_accounts"], "args": {}}]}
