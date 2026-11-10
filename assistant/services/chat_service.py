@@ -2,7 +2,7 @@ import json
 import logging
 import uuid
 from collections.abc import AsyncIterator, Callable
-from dataclasses import asdict
+from dataclasses import asdict, dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
@@ -31,6 +31,18 @@ from assistant.tools.base import ProposalSaver, ToolContext, HandoffRecorder, He
 from assistant.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
+
+
+# What the tools produced during ONE reply that the app has not been told about yet.
+# The tools fill these lists while they run; after each round of lookups ChatService turns
+# them into SSE events and empties them. "field(default_factory=list)" gives every reply its
+# own fresh lists (a plain "= []" would share one list between all replies).
+@dataclass
+class PendingAnnouncements:
+    # Proposals saved by the propose tools: the app shows an approval sheet for each
+    proposals: list[ProposalOut] = field(default_factory=list)
+    # Names of the help-center articles the search returned: the app shows them as sources
+    article_names: list[str] = field(default_factory=list)
 
 
 # Reads the system prompt file the first time it is needed, then reuses it
@@ -86,14 +98,9 @@ class ChatService:
         message_id = str(uuid.uuid4())
         trace_id = str(uuid.uuid4())
 
-        # Proposals the tools save during this reply. They are announced to the app after each round.
-        created_proposals: list[ProposalOut] = []
-        context = ToolContext(
-            self.ledger,
-            self._proposal_saver(session_id, owner, created_proposals),
-            self._handoff_function_for_tools(session_id, owner),
-            self._help_search_function_for_tools(),
-        )
+        # Filled by the tools while they run, announced to the app after each round
+        pending = PendingAnnouncements()
+        context = self._build_tool_context(session_id, owner, pending)
 
         parts = []
         # Each round of lookups the agent reports. Saved with the reply so later turns know the real ids.
@@ -107,12 +114,10 @@ class ChatService:
                     # Lets the app show "Checking your account…" while the tool works
                     yield sse("tool", {"name": event.name})
                 elif isinstance(event, ToolRound):
-                    # Not for the customer: kept so we can save it with the reply
+                    # Kept so we can save it with the reply
                     rounds.append(event)
-                    # Any proposal saved in this round: tell the app to show its approval sheet
-                    for proposal in created_proposals:
-                        yield sse("approval_required", proposal.model_dump(mode="json"))
-                    created_proposals.clear()
+                    for announcement in self._announcements_after_round(pending):
+                        yield announcement
                 else:
                     parts.append(event.text)
                     yield sse("token", {"text": event.text})
@@ -122,7 +127,39 @@ class ChatService:
             yield sse("error", {"message": "The assistant is unavailable right now. Please try again"})
             return
 
-        reply = Message(
+        reply = self._assemble_reply(message_id, trace_id, session_id, owner, parts, rounds)
+        # Save in a worker thread so the (blocking) database call doesn't freeze other streams
+        await run_in_threadpool(self._save_reply, reply)
+
+        # Save first, then say "done", so a client never hears "done" about an unsaved reply
+        yield sse("done", {"message_id": message_id, "trace_id": trace_id})
+
+    # Gives the tools everything they need to reach the outside world: the ledger, and one function each
+    # for saving a proposal, handing off to a person and searching the help center. The two that
+    # produce something to announce write into "pending".
+    def _build_tool_context(self, session_id: str, owner: str, pending: PendingAnnouncements) -> ToolContext:
+        return ToolContext(
+            self.ledger,
+            self._proposal_saver(session_id, owner, pending.proposals),
+            self._handoff_function_for_tools(session_id, owner),
+            self._help_search_function_for_tools(pending.article_names),
+        )
+
+    # After a round of lookups: the SSE events for whatever the tools produced in it, then the lists are
+    # emptied so the next round announces only what is new. Returns text ready to send.
+    def _announcements_after_round(self, pending: PendingAnnouncements) -> list[str]:
+        announcements = [sse("approval_required", p.model_dump(mode="json")) for p in pending.proposals]
+        if pending.article_names:
+            announcements.append(sse("sources", {"articles": list(pending.article_names)}))
+        pending.proposals.clear()
+        pending.article_names.clear()
+        return announcements
+
+    # Builds the assistant's reply as it will be stored
+    def _assemble_reply(
+            self, message_id: str, trace_id: str, session_id: str, owner: str, parts: list[str], rounds: list[ToolRound]
+    ) -> Message:
+        return Message(
             message_id=message_id,
             session_id=session_id,
             customer_id_hash=owner,
@@ -132,11 +169,6 @@ class ChatService:
             # asdict turns the dataclasses into plain dicts that json.dumps can store
             tool_trace_json=json.dumps([asdict(r) for r in rounds]),
         )
-        # Save in a worker thread so the (blocking) database call doesn't freeze other streams
-        await run_in_threadpool(self._save_reply, reply)
-
-        # Save first, then say "done", so a client never hears "done" about an unsaved reply
-        yield sse("done", {"message_id": message_id, "trace_id": trace_id})
 
     # Uses its OWN session: the request's session may already be closed when a stream ends
     def _save_reply(self, reply: Message) -> None:
@@ -169,11 +201,16 @@ class ChatService:
 
     # Builds the function the help-center tool calls. Like the others it opens its own database session,
     # so the tool never sees a database. The session stays open while the question is embedded (a fraction of a second).
-    def _help_search_function_for_tools(self) -> HelpSearcher:
+    # "article_names" collects the name of each article the search returned, so the app can show them as sources.
+    def _help_search_function_for_tools(self, article_names: list[str]) -> HelpSearcher:
         async def look_up_passages_for_question(question: str) -> list[dict]:
             with self.session_factory() as db:
                 service = HelpCenterService(db, HelpPassageRepository(db), embed_texts_for_search)
                 found = await service.find_relevant_passages(question)
+            # Several passages can come from one article: keep each name once, in the order found
+            for passage in found:
+                if passage.article not in article_names:
+                    article_names.append(passage.article)
             return [{"article": f.article, "heading": f.heading, "text": f.text, "source": f.source} for f in found]
 
         return look_up_passages_for_question

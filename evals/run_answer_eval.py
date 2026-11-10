@@ -29,8 +29,9 @@ ADMITS_IT_DOES_NOT_KNOW = [
 ]
 
 
-# One JSON object per line: {"id", "question"} plus either "must_state" (a list of facts; each fact is a list
-# of acceptable wordings) or "must_say_unknown": true (the help center has nothing on it)
+# One JSON object per line: {"id", "question"} plus any of: "must_state" (a list of facts; each fact is a list
+# of acceptable wordings), "must_say_unknown": true (the help center has nothing on it), "must_cite" (titles of
+# the articles that must come back as sources) or "must_cite_nothing": true (no article should come back)
 def load_cases(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
@@ -78,12 +79,24 @@ def find_problems(case: dict, answer: str, passages: list[dict]) -> list[str]:
     if not answer.strip():
         return ["no answer"]
 
+    # The articles the search returned: exactly what the app announces to the customer as sources
+    returned = {p["article"] for p in passages}
+
     for wordings in case.get("must_state", []):
         if not any(wording.lower() in lowered for wording in wordings):
             problems.append(f"missing fact: {wordings[0]!r}")
 
     if case.get("must_say_unknown") and not any(phrase in lowered for phrase in ADMITS_IT_DOES_NOT_KNOW):
         problems.append("did not admit it has no information")
+
+    # Sources: every article the case names must be among the ones returned (retrieval found the right place)
+    for title in case.get("must_cite", []):
+        if title not in returned:
+            problems.append(f"sources missing article: {title!r}")
+
+    # For a question the help center cannot answer, the app must have nothing to cite
+    if case.get("must_cite_nothing") and returned:
+        problems.append(f"sources should be empty but were: {sorted(returned)}")
 
     # Every number in the answer must come from the question or a passage; anything else was invented
     allowed = numbers_in(case["question"]) | numbers_in(" ".join(p["text"] for p in passages))
@@ -92,7 +105,6 @@ def find_problems(case: dict, answer: str, passages: list[dict]) -> list[str]:
         problems.append(f"numbers not in the passages: {sorted(invented)}")
 
     # An article may be named only if the search returned it
-    returned = {p["article"] for p in passages}
     for title in all_article_titles():
         if title.lower() in lowered and title not in returned:
             problems.append(f"named an article it was not given: {title!r}")
@@ -101,7 +113,7 @@ def find_problems(case: dict, answer: str, passages: list[dict]) -> list[str]:
 
 async def run(cases: list[dict], runs: int) -> list[dict]:
     # The app's own search function, so the eval retrieves exactly as a real chat does (real Ollama, indexed dev database)
-    search_help = ChatService(None, None, REGISTRY, ROUTER)._help_search_function_for_tools()
+    search_help = ChatService(None, None, REGISTRY, ROUTER)._help_search_function_for_tools([])
     # The first embedding after Ollama has been idle loads the embedding model (about 20 seconds), far longer than the
     # search tool's 2-second limit. Load it once now so the cases measure answers, not that cold start.
     await embed_texts_for_search(["warm up"])

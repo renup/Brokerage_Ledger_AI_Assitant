@@ -154,3 +154,71 @@ def test_on_the_help_route_the_search_runs_even_if_the_model_never_asks(monkeypa
     # The model was asked once, and already had the search result in front of it
     assert len(seen) == 1
     assert any(m["role"] == "tool" and "what fees cost" in m["content"] for m in seen[0])
+
+
+# The app is told which article the answer came from, and hears it before "done"
+def test_on_the_help_route_the_app_is_told_which_article_the_answer_came_from(monkeypatch):
+    embedder = FakeEmbedder()
+    with Session(engine) as db:
+        asyncio.run(HelpCenterService(db, HelpPassageRepository(db), embedder).index_help_center_articles(ARTICLES))
+    monkeypatch.setattr(chat_service, "embed_texts_for_search", embedder)
+
+    async def only_answers(messages, tools=None):
+        yield "Fees depend on the account."
+
+    monkeypatch.setattr(llm, "stream_turn", only_answers)
+    assistant_app.dependency_overrides[get_current_user] = lambda: MAYA
+    assistant_app.dependency_overrides[get_ledger_client] = lambda: FakeLedger()
+    assistant_app.dependency_overrides[get_tool_router] = lambda: HelpRouting()
+    try:
+        client = TestClient(assistant_app)
+        events = parse_sse(client.post("/chat", json={"session_id": "s3", "message": "what do fees cost?"}).text)
+    finally:
+        assistant_app.dependency_overrides.clear()
+
+    names = [name for name, _ in events]
+    # Every test passage is in the article "Guide"; the fees question matches only one passage
+    assert ("sources", {"articles": ["Guide"]}) in events
+    assert names.index("sources") < names.index("done")
+
+
+# No search, no sources: a reply that did not use the help center must not claim one
+def test_a_reply_without_a_help_search_sends_no_sources(monkeypatch):
+    async def only_answers(messages, tools=None):
+        yield "Hello there."
+
+    monkeypatch.setattr(llm, "stream_turn", only_answers)
+    assistant_app.dependency_overrides[get_current_user] = lambda: MAYA
+    assistant_app.dependency_overrides[get_ledger_client] = lambda: FakeLedger()
+    assistant_app.dependency_overrides[get_tool_router] = lambda: NoRouting()
+    try:
+        client = TestClient(assistant_app)
+        events = parse_sse(client.post("/chat", json={"session_id": "s4", "message": "hi"}).text)
+    finally:
+        assistant_app.dependency_overrides.clear()
+
+    assert "sources" not in [name for name, _ in events]
+
+
+# The search ran but found nothing close enough: there is nothing to cite
+def test_a_help_search_that_finds_nothing_sends_no_sources(monkeypatch):
+    embedder = FakeEmbedder()
+    with Session(engine) as db:
+        asyncio.run(HelpCenterService(db, HelpPassageRepository(db), embedder).index_help_center_articles(ARTICLES))
+    monkeypatch.setattr(chat_service, "embed_texts_for_search", embedder)
+
+    async def only_answers(messages, tools=None):
+        yield "I do not have that information."
+
+    monkeypatch.setattr(llm, "stream_turn", only_answers)
+    assistant_app.dependency_overrides[get_current_user] = lambda: MAYA
+    assistant_app.dependency_overrides[get_ledger_client] = lambda: FakeLedger()
+    assistant_app.dependency_overrides[get_tool_router] = lambda: HelpRouting()
+    try:
+        client = TestClient(assistant_app)
+        events = parse_sse(client.post("/chat", json={"session_id": "s5", "message": "what is the weather?"}).text)
+    finally:
+        assistant_app.dependency_overrides.clear()
+
+    names = [name for name, _ in events]
+    assert "tool" in names and "sources" not in names
