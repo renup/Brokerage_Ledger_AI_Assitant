@@ -1,3 +1,6 @@
+import re
+
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from assistant.models import HelpPassage
@@ -26,3 +29,21 @@ class HelpPassageRepository:
         distance = HelpPassage.embedding.cosine_distance(question_vector)
         rows = self.db.exec(select(HelpPassage, distance).order_by(distance).limit(limit)).all()
         return [(row, float(far)) for row, far in rows]
+
+    # The passages that contain the most of the question's words, best first, each with its keyword score.
+    # The question's words are joined with "|" (OR), so a passage needs only SOME of them: customers write
+    # sentences, not search terms. Postgres drops filler words ("what", "is") and stems the rest ("charged" ->
+    # "charg"). The score (ts_rank_cd) is higher when more of the words appear, and closer together.
+    def best_by_keywords(self, question: str, limit: int) -> list[tuple[HelpPassage, float]]:
+        # Only letters and digits are kept, so nothing a customer types can change the shape of the
+        # search expression (it has its own symbols, such as & and |)
+        words = re.findall(r"[A-Za-z0-9]+", question)
+        if not words:
+            return []
+        query = func.to_tsquery("english", " | ".join(words))
+        score = func.ts_rank_cd(HelpPassage.search_vector, query)
+        # "@@" is Postgres' "this text matches this query"; it uses the GIN index
+        rows = self.db.exec(
+            select(HelpPassage, score).where(HelpPassage.search_vector.op("@@")(query)).order_by(score.desc()).limit(limit)
+        ).all()
+        return [(row, float(points)) for row, points in rows]
