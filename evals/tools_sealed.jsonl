@@ -1,3 +1,21 @@
 {"id": "sealed-1", "category": "no tool", "question": "ok cool thanks", "expected_tools": [], "expected_args": {}}
-{"id": "sealed-2", "category": "two tools", "question": "Can I pull out 2500 bucks today and tell me my balance after withdrawal", "expected_tools": ["check_withdrawal_eligibility"], "expected_args": {"check_withdrawal_eligibility": {"amount": 2500}}}
+{"id": "sealed-2", "category": "multi-tools", "question": "Can I pull out 2500 bucks today and tell me my balance after withdrawal", "expected_tools": ["check_withdrawal_eligibility"], "expected_args": {"check_withdrawal_eligibility": {"amount": 2500}}, "alternatives": [{"tools": ["check_withdrawal_eligibility"], "args": {"check_withdrawal_eligibility": {"amount": 2500}}}]}
 {"id": "sealed-3", "category": "help_center", "question": "what does retirement account mean?", "expected_tools": ["search_help_center"], "expected_args": {}}
+{"id": "sealed-4", "category": "search tool", "question": "What are the criteria to withdraw funds from IRA account?", "expected_tools": ["search_help_center"], "expected_args": {}}
+{"id": "sealed-5", "category": "multi-tools", "question": "Can you help me find out where my transfer is and approximately when I will receive funds?", "expected_tools": ["get_transfers"], "expected_args": {}}
+{"id": "sealed-6", "category": "fees_tool", "question": "Do you charge any fees for my IRA account and how much if you do? ", "expected_tools": ["get_fees"], "expected_args": {}}
+{"id": "sealed-7", "category": "tax_tool", "question": "What all forms do I need to fill if I did trading this year?", "expected_tools": ["search_help_center"], "expected_args": {}, "alternatives": [{"tools": ["get_tax_documents"], "args": {}}]}
+{"id": "sealed-8", "category": "multi-tool", "question": "I am trying to find how much balance I have in my account and I am receiving error 215. Can you help me find out my balance?", "expected_tools": ["lookup_error_code", "get_accounts"], "expected_args": {}}
+{"id": "sealed-9", "category": "estimate_arrival_tool", "question": "I transferred my IRA to your firm. When will I receive my funds in my account?", "expected_tools": ["get_transfers"], "expected_args": {}}
+{"id": "sealed-10", "category": "withdrawal_eligibility_tool", "question": "can you check if i can withdraw my IRA funds? I m 45 and um-employed", "expected_tools": ["get_accounts"], "expected_args": {}, "alternatives": [{"tools": [], "args": {}}]}
+{"id": "sealed-11", "category": "multi-tool", "question": "I don't think you know how to check why I am getting error 214 while accessing my account. Please call an agent", "expected_tools": ["lookup_error_code", "escalate_to_human"], "expected_args": {}}
+{"id": "sealed-12", "category": "escalte_tool", "question": "I need help with dsputing a transaction", "expected_tools": ["escalate_to_human"], "expected_args": {}}
+{"id": "sealed-13", "category": "account_tool", "question": "can you help me understand how my balance is only 250 right now?", "expected_tools": ["get_accounts"], "expected_args": {}}
+{"id": "sealed-14", "category": "multi-tool", "question": "I am trying to see my withdrawal status but am getting some 240 error. Can you help?", "expected_tools": ["lookup_error_code", "get_withdrawals"], "expected_args": {}}
+{"id": "sealed-15", "category": "propose_tool", "question": "Can you help me with cancelling my withdrawal?", "expected_tools": ["get_withdrawals"], "expected_args": {}, "alternatives": [{"tools": [], "args": {}}]}
+{"id": "sealed-16", "category": "propose_tool", "question": "Can you help me fix my last name on my account", "expected_tools": ["propose_legal_name_change"], "expected_args": {}}
+{"id": "sealed-17", "category": "transfer_tool", "question": "Need help with transfer status", "expected_tools": ["get_transfers"], "expected_args": {}}
+{"id": "sealed-18", "category": "multi-tool", "question": "Need help close my account and transfer all my assets", "expected_tools": ["escalate_to_human", "search_help_center"], "expected_args": {}, "alternatives": [{"tools": ["escalate_to_human"], "args":{}}]}
+{"id": "sealed-19", "category": "error_tool", "question": "I am not able to login and it is erroring out", "expected_tools": [], "expected_args": {}, "alternatives": [{"tools": ["escalate_to_human"], "args": {}}]}
+{"id": "sealed-20", "category": "error_tool", "question": "How much will I have to pay to transfer out my account", "expected_tools": ["get_fees"], "expected_args": {}}
+
