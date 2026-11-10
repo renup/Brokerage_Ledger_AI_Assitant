@@ -4,7 +4,7 @@ account - looking up the customer's own accounts, balances, withdrawals or trans
 reference - what things cost (fees and charges), where the customer's own tax documents are, what an error code means, or on what date the customer's own money will arrive
 help - general questions about how things work at this firm (rules, limits, how long a kind of process usually takes, what an account type, a tax form or a term means), never about the customer's own items
 change - the customer asks to retry a transfer, cancel a withdrawal, or change their legal name
-human - the customer asks for a person, wants to complain or dispute something, or needs something nothing else here can do
+human - the customer asks for a person, wants to complain or dispute something, or needs something nothing else here can do, needs help with account closing
 none - thanks, a greeting, small talk, a request for investment advice, or anything unrelated to the brokerage
 
 Rules:
@@ -15,6 +15,7 @@ Rules:
 - A follow-up about something the customer already asked about, such as "any news on it?" or "what went wrong with that one?", is "account" only.
 - Asking about another person's accounts is "none".
 - When unsure between none and another word, choose the other word.
+- Closing an account is always human, even when the message also mentions transfers or moving assets.
 
 Examples:
 - "what's in my IRA?" -> account
@@ -27,6 +28,7 @@ Examples:
 - "where is my 1099?" -> reference
 - "what does error 220 mean?" -> reference
 - "when will my withdrawal reach my bank?" -> account, reference
+- "I want to close my account" -> human
 - "cancel it" -> change
 - "let me talk to a real person" -> human
 - "I want to dispute this fee" -> human
