@@ -97,9 +97,9 @@ class HelpCenterService:
         self.db.commit()
         return IndexReport(added, updated, len(current) - len(needs_embedding), removed)
 
-    # The passages that answer a question, nearest first. Anything beyond MAX_DISTANCE is dropped, so an
-    # empty list means "the help center has nothing on this" and the assistant must say so, not guess.
-    async def find_relevant_passages(self, question: str, limit: int = 3) -> list[FoundPassage]:
+    # The passages nearest in meaning to the question, nearest first. Anything beyond MAX_DISTANCE is dropped.
+    # "Nearby" is not yet "answers it": the passage judge (passage_judge.py) checks that afterwards.
+    async def find_nearby_passages(self, question: str, limit: int = 3) -> list[FoundPassage]:
         [question_vector] = await self.embed([QUESTION_LABEL + question])
         return [
             FoundPassage(row.article, row.heading, row.text, row.source, distance)

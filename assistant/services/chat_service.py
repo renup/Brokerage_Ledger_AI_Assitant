@@ -24,6 +24,7 @@ from assistant.services.tool_router import ToolRouter, required_calls_for
 from assistant.clients.embeddings import embed_texts_for_search
 from assistant.repositories.help_passages import HelpPassageRepository
 from assistant.services.help_center_service import HelpCenterService
+from assistant.services.passage_judge import keep_only_passages_that_answer
 
 from assistant.clients.ledger import LedgerClient
 from assistant.services.agent import ToolRound, ToolStarted, run_agent
@@ -200,13 +201,16 @@ class ChatService:
         return hand_off_and_get_reference
 
     # Builds the function the help-center tool calls. Like the others it opens its own database session,
-    # so the tool never sees a database. The session stays open while the question is embedded (a fraction of a second).
+    # so the tool never sees a database. The session stays open while the question is embedded and searched (a fraction
+    # of a second), and is closed before the judge checks the passages.
     # "article_names" collects the name of each article the search returned, so the app can show them as sources.
     def _help_search_function_for_tools(self, article_names: list[str]) -> HelpSearcher:
         async def look_up_passages_for_question(question: str) -> list[dict]:
             with self.session_factory() as db:
                 service = HelpCenterService(db, HelpPassageRepository(db), embed_texts_for_search)
-                found = await service.find_relevant_passages(question)
+                nearby = await service.find_nearby_passages(question)
+            # Outside the "with": the judge is a model call (about a second) and must not hold a database connection
+            found = await keep_only_passages_that_answer(question, nearby)
             # Several passages can come from one article: keep each name once, in the order found
             for passage in found:
                 if passage.article not in article_names:

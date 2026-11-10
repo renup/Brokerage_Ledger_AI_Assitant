@@ -26,6 +26,16 @@ from tests.test_help_center_service import ARTICLES, FakeEmbedder
 registry = ToolRegistry(ALL_TOOLS)
 
 
+# The real judge asks the model, which these tests have replaced with scripted fakes, so by default the judge
+# keeps every nearby passage. The judge's own behaviour is tested in test_passage_judge.py.
+@pytest.fixture(autouse=True)
+def judge_keeps_every_nearby_passage(monkeypatch):
+    async def keep_all(question, passages):
+        return passages
+
+    monkeypatch.setattr(chat_service, "keep_only_passages_that_answer", keep_all)
+
+
 @pytest.fixture(autouse=True)
 def empty_tables():
     with Session(engine) as session:
@@ -222,3 +232,36 @@ def test_a_help_search_that_finds_nothing_sends_no_sources(monkeypatch):
 
     names = [name for name, _ in events]
     assert "tool" in names and "sources" not in names
+
+
+# The judge has the last word: nearby passages it rejects never reach the model, and no source is announced
+def test_passages_the_judge_rejects_are_not_given_to_the_model_or_announced_as_sources(monkeypatch):
+    embedder = FakeEmbedder()
+    with Session(engine) as db:
+        asyncio.run(HelpCenterService(db, HelpPassageRepository(db), embedder).index_help_center_articles(ARTICLES))
+    monkeypatch.setattr(chat_service, "embed_texts_for_search", embedder)
+
+    async def reject_all(question, passages):
+        return []
+
+    monkeypatch.setattr(chat_service, "keep_only_passages_that_answer", reject_all)
+
+    seen = []
+
+    async def only_answers(messages, tools=None):
+        seen.append(messages)
+        yield "I do not have that information."
+
+    monkeypatch.setattr(llm, "stream_turn", only_answers)
+    assistant_app.dependency_overrides[get_current_user] = lambda: MAYA
+    assistant_app.dependency_overrides[get_ledger_client] = lambda: FakeLedger()
+    assistant_app.dependency_overrides[get_tool_router] = lambda: HelpRouting()
+    try:
+        client = TestClient(assistant_app)
+        events = parse_sse(client.post("/chat", json={"session_id": "s6", "message": "what do fees cost?"}).text)
+    finally:
+        assistant_app.dependency_overrides.clear()
+
+    assert "sources" not in [name for name, _ in events]
+    tool_results = [m["content"] for m in seen[0] if m["role"] == "tool"]
+    assert len(tool_results) == 1 and "Do not answer from memory" in tool_results[0]

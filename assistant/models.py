@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Column, UniqueConstraint
+from sqlalchemy import Column, UniqueConstraint, Computed, Index
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlmodel import Field, SQLModel
 
 from assistant.action_types import ActionStatus
@@ -83,8 +84,12 @@ class AuditEntry(SQLModel, table=True):
 # One searchable piece of the help center, stored with the numbers that represent its meaning
 class HelpPassage(SQLModel, table=True):
     __tablename__ = "help_passages"
-    # A section heading is unique within its article, so (source, heading) identifies a passage
-    __table_args__ = (UniqueConstraint("source", "heading"),)
+    # A section heading is unique within its article, so (source, heading) identifies a passage.
+    # The GIN index makes keyword search fast; it is the full-text search equivalent of an ordinary index.
+    __table_args__ = (
+        UniqueConstraint("source", "heading"),
+        Index("ix_help_passages_search_vector", "search_vector", postgresql_using="gin"),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
     # The article's file name, e.g. "fees-and-charges.md"
@@ -98,4 +103,15 @@ class HelpPassage(SQLModel, table=True):
     # The meaning of the passage as numbers. A normal field type can't be a "vector" column, so we
     # give SQLAlchemy the column directly.
     embedding: list[float] = Field(sa_column=Column(Vector(settings.embedding_dimensions), nullable=False))
+
+    # The words of the passage prepared for keyword search (lowercased, stemmed, filler words removed).
+    # "Computed" means Postgres fills this itself from article, heading and text and keeps it current,
+    # so our code never writes it. The words are the same ones we embed (see Passage.searchable_text).
+    search_vector: str | None = Field(
+        default=None,
+        sa_column=Column(
+            TSVECTOR,
+            Computed("to_tsvector('english', article || ' ' || heading || ' ' || text)", persisted=True),
+        ),
+    )
 

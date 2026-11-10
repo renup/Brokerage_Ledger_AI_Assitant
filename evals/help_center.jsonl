@@ -21,6 +21,7 @@
 {"id": "hc-21", "question": "Can my husband look at my account through you?", "expected_source": "account-and-security.md", "expected_heading": "Who can see your accounts"}
 {"id": "hc-22", "question": "How can I speak to a human?", "expected_source": "account-and-security.md", "expected_heading": "Talking to a person"}
 {"id": "hc-23", "question": "Does the assistant make changes on its own?", "expected_source": "account-and-security.md", "expected_heading": "Changes need your approval"}
+{"id": "hc-24", "question": "When will I get my 1099-B?", "expected_source": "tax-documents.md", "expected_heading": "When forms are ready"}
 {"id": "off-01", "question": "Which stock should I buy right now?", "expected_source": null, "expected_heading": null}
 {"id": "off-02", "question": "What's the weather in Chicago today?", "expected_source": null, "expected_heading": null}
 {"id": "off-03", "question": "Write me a poem about the ocean.", "expected_source": null, "expected_heading": null}
@@ -29,3 +30,10 @@
 {"id": "off-06", "question": "What is the capital of France?", "expected_source": null, "expected_heading": null}
 {"id": "off-07", "question": "Explain how cryptocurrency mining works.", "expected_source": null, "expected_heading": null}
 {"id": "off-08", "question": "Can you recommend a good movie?", "expected_source": null, "expected_heading": null}
+{"id": "off-09", "question": "What would be NVDA's price tomorrow? Is it a buy or sell?", "expected_source": null, "expected_heading": null}
+{"id": "off-10", "question": "Do you support crypto trading?", "expected_source": null, "expected_heading": null}
+{"id": "off-11", "question": "What are the cutomer agent hours for asking questions?", "expected_source": null, "expected_heading": null}
+{"id": "off-12", "question": "Can you help me change my home address on my account?", "expected_source": null, "expected_heading": null}
+{"id": "off-13", "question": "Can you help me add a beneficiary for my account?", "expected_source": null, "expected_heading": null}
+{"id": "off-14", "question": "Can I do outgoing wire to my friend?", "expected_source": null, "expected_heading": null}
+{"id": "off-15", "question": "Can I have a Roth IRA account and brokerage account both at your firm?", "expected_source": null, "expected_heading": null}

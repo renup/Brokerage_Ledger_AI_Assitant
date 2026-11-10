@@ -1,5 +1,7 @@
 import asyncio
 import json
+import statistics
+import time
 from pathlib import Path
 
 from sqlmodel import Session
@@ -7,7 +9,8 @@ from sqlmodel import Session
 from assistant.clients.embeddings import embed_texts_for_search
 from assistant.database import engine
 from assistant.repositories.help_passages import HelpPassageRepository
-from assistant.services.help_center_service import MAX_DISTANCE, QUESTION_LABEL
+from assistant.services.help_center_service import MAX_DISTANCE, QUESTION_LABEL, FoundPassage
+from assistant.services.passage_judge import keep_only_passages_that_answer
 
 DATASET = Path(__file__).parent / "help_center.jsonl"
 # Cut-offs to compare, so MAX_DISTANCE is chosen from measurements and not guessed
@@ -23,7 +26,13 @@ async def measure_retrieval() -> list[dict]:
         repo = HelpPassageRepository(db)
         for case, vector in zip(cases, vectors):
             nearest = [((row.source, row.heading), distance) for row, distance in repo.closest_to(vector, 3)]
-            results.append({**case, "nearest": nearest})
+            # What the app would hand to the passage judge: the nearby passages inside the cut-off
+            nearby = [
+                FoundPassage(row.article, row.heading, row.text, row.source, distance)
+                for row, distance in repo.closest_to(vector, 3)
+                if distance <= MAX_DISTANCE
+            ]
+            results.append({**case, "nearest": nearest, "nearby": nearby})
     return results
 
 
@@ -58,5 +67,46 @@ def report(results: list[dict]) -> None:
         print(f"{cutoff:>8.2f} {kept:>10}/{len(in_scope):<3} {rejected:>14}/{len(off_topic):<3}{marker}")
 
 
+# What the passage judge adds on top of the cut-off. Each question goes through the judge JUDGE_RUNS times, because
+# a model can answer differently each time. Real questions should keep their expected passage; questions the help
+# center cannot answer should end with nothing kept. Also times the judge, because the search tool has a hard
+# 2 second limit (registry.py) and the judge runs inside it.
+JUDGE_RUNS = 2
+
+
+async def report_judge(results: list[dict]) -> None:
+    kept_expected = rejected_unknown = in_scope_attempts = off_topic_attempts = 0
+    seconds = []
+    for r in results:
+        wanted = (r["expected_source"], r["expected_heading"])
+        for _ in range(JUDGE_RUNS):
+            started = time.perf_counter()
+            kept = await keep_only_passages_that_answer(r["question"], r["nearby"])
+            # A question with no nearby passage never reaches the model, so it says nothing about speed
+            if r["nearby"]:
+                seconds.append(time.perf_counter() - started)
+            kept_places = [(p.source, p.heading) for p in kept]
+            if r["expected_source"]:
+                in_scope_attempts += 1
+                if wanted in kept_places:
+                    kept_expected += 1
+                else:
+                    print(f"  JUDGE DROPPED {r['id']} {r['question']!r} (kept {[h for _, h in kept_places]})")
+            else:
+                off_topic_attempts += 1
+                if not kept:
+                    rejected_unknown += 1
+                else:
+                    print(f"  JUDGE LET THROUGH {r['id']} {r['question']!r} -> {[h for _, h in kept_places]}")
+
+    print(f"\nwith the passage judge ({JUDGE_RUNS} runs per question):")
+    print(f"  real questions that still get their passage: {kept_expected}/{in_scope_attempts}")
+    print(f"  unknown questions turned away:               {rejected_unknown}/{off_topic_attempts}")
+    if seconds:
+        print(f"  judge time per question: median {statistics.median(seconds):.2f}s  max {max(seconds):.2f}s  (tool limit 2.00s, search included)")
+
+
 if __name__ == "__main__":
-    report(asyncio.run(measure_retrieval()))
+    measured = asyncio.run(measure_retrieval())
+    report(measured)
+    asyncio.run(report_judge(measured))
