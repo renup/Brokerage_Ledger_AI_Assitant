@@ -1,9 +1,11 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from assistant.clients.model_warmup import load_models_into_memory
 from assistant.config import settings
 from assistant.errors import NotFoundError, ActionAlreadyDecidedError, ActionExpiredError
 from assistant.routers import chat, health, sessions, actions
@@ -18,7 +20,11 @@ async def lifespan(app: FastAPI):
     async with httpx.AsyncClient(base_url=settings.ledger_core_url) as http:
         # app.state is a place to keep things that live as long as the server does
         app.state.http = http
+        # In the background (a task), so the server answers requests while the models load. We keep the task in a
+        # variable so it is not garbage-collected half way, and cancel it if the server stops first.
+        warm_up = asyncio.create_task(load_models_into_memory())
         yield
+        warm_up.cancel()
     # Leaving the "async with" block closes the pool cleanly at shutdown
 
 

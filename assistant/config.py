@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     # means changing this, then re-embedding every passage.
     embedding_dimensions: int = 768
 
+    # How long the warm-up at start-up asks Ollama to keep the chat and embedding models in memory ("1h", "30m",
+    # or "-1" for forever). Without this Ollama unloads an idle model after 5 minutes and the next customer waits
+    # for it to load. After real requests Ollama uses ITS OWN default (the OLLAMA_KEEP_ALIVE setting), see the README.
+    model_keep_alive: str = "1h"
+
     # extra="ignore": the shared .env also holds ledger-core's settings (JWT_SECRET etc.).
     # Without this, pydantic would reject them as unknown fields.
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
