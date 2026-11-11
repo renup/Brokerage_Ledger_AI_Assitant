@@ -192,7 +192,16 @@ uv run uvicorn assistant.main:app --port 8001 --reload
 uv run python web/app.py            # chat page at http://localhost:7860
 ```
 
-Run the tests with `uv run pytest` (171 tests). They use the `ledger_core_test` and `assistant_test` databases, so demo data is never touched.
+### Keeping the models loaded (Ollama)
+
+Ollama unloads an idle model after 5 minutes, and loading the chat model takes about 8 seconds, longer than the 2-second limit each tool gets. Two settings keep the first question after a quiet spell from failing:
+
+- `MODEL_KEEP_ALIVE` (default `1h`, in `.env`): at start-up the assistant loads the chat and embedding models in the background and asks Ollama to keep them for this long. If Ollama is down it only logs a warning. This applies to that one request.
+- `OLLAMA_KEEP_ALIVE` on the Ollama server itself: every later request resets the timer to the server's own default, so set it to the same value. It applies to every model on that Ollama, then restart Ollama. For the menu-bar app: `launchctl setenv OLLAMA_KEEP_ALIVE 1h`, then quit and reopen Ollama. For a terminal: `OLLAMA_KEEP_ALIVE=1h ollama serve`. Use `30m` if memory is tight (the two models take about 7 GB).
+
+Production differs: a hosted model or an always-on inference server never unloads, so there is nothing to keep alive. The warm-up uses Ollama-only endpoints, so drop it when switching providers.
+
+Run the tests with `uv run pytest` (197 tests). They use the `ledger_core_test` and `assistant_test` databases, so demo data is never touched.
 
 Changing a table: edit the model, run `uv run alembic -c <service>/alembic.ini revision --autogenerate -m "what changed"`, review the generated file, then `upgrade head`.
 
