@@ -58,7 +58,7 @@ class ToolRegistry:
 
         try:
             # asyncio.timeout cancels the block if the tool takes longer than the limit
-            async with asyncio.timeout(self._timeout):
+            async with asyncio.timeout(tool.timeout_seconds or self._timeout):
                 result = await tool.run(context, args)
         except TimeoutError:
             return self.error_result(name, "The lookup took too long. Ask the customer to try again soon.")

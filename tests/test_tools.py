@@ -114,6 +114,32 @@ def test_a_tool_that_takes_too_long_is_cut_off_with_a_readable_error():
     assert "took too long" in result["error"]
 
 
+def test_a_tool_with_its_own_longer_limit_is_not_cut_off_by_the_registry_limit():
+    async def a_little_slow(context, args):
+        await asyncio.sleep(0.2)
+        return {"done": True}
+
+    patient = Tool(
+        name="patient", description="needs a longer limit", args_model=NoArgs, run=a_little_slow,
+        groups=frozenset({ToolGroup.ACCOUNT_DATA}), timeout_seconds=2.0,
+    )
+    impatient = Tool(
+        name="impatient", description="uses the registry limit", args_model=NoArgs, run=a_little_slow,
+        groups=frozenset({ToolGroup.ACCOUNT_DATA}),
+    )
+    registry = ToolRegistry([patient, impatient], timeout=0.05)
+
+    assert json.loads(asyncio.run(registry.execute(FakeLedger(), "patient", "{}")))["data"] == {"done": True}
+    assert "took too long" in json.loads(asyncio.run(registry.execute(FakeLedger(), "impatient", "{}")))["error"]
+
+
+def test_only_the_help_search_has_a_longer_limit():
+    from assistant.tools import ALL_TOOLS
+
+    longer = {tool.name: tool.timeout_seconds for tool in ALL_TOOLS if tool.timeout_seconds is not None}
+    assert longer == {"search_help_center": 5.0}
+
+
 def test_fees_tool_asks_ledger_core_for_the_callers_fees():
     ledger = FakeLedger()
     result = run(ledger, "get_fees", "{}")

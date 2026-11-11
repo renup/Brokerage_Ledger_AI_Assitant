@@ -75,6 +75,8 @@ class Tool:
     run: Callable[[ToolContext, ToolArgs], Awaitable[object]]
     # Which kinds of help this tool belongs to. Required, so no tool can silently be left out of every menu.
     groups: frozenset[ToolGroup]
+    # NEW: a longer limit for a tool that is slow by nature. None means "use the registry's limit" (2 seconds)
+    timeout_seconds: float | None = None
 
     # The tool as the model sees it, in the standard "function" format that Ollama accepts.
     # The JSON schema is generated from the args model, so it can never drift from the validation.

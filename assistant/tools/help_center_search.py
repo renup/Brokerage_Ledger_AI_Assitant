@@ -46,5 +46,8 @@ TOOLS = [
         args_model=HelpSearchArgs,
         run=search_help_center,
         groups=frozenset({ToolGroup.HELP_CENTER}),
+        # NEW: this tool embeds the question, searches, and asks the model to judge the passages. That is about 1 second
+        # when the models are warm and up to 2.5 seconds on the first question after a start-up
+        timeout_seconds=5.0,
     ),
 ]
