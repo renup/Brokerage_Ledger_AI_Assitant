@@ -199,9 +199,14 @@ Ollama unloads an idle model after 5 minutes, and loading the chat model takes a
 - `MODEL_KEEP_ALIVE` (default `1h`, in `.env`): at start-up the assistant loads the chat and embedding models in the background and asks Ollama to keep them for this long. If Ollama is down it only logs a warning. This applies to that one request.
 - `OLLAMA_KEEP_ALIVE` on the Ollama server itself: every later request resets the timer to the server's own default, so set it to the same value. It applies to every model on that Ollama, then restart Ollama. For the menu-bar app: `launchctl setenv OLLAMA_KEEP_ALIVE 1h`, then quit and reopen Ollama. For a terminal: `OLLAMA_KEEP_ALIVE=1h ollama serve`. Use `30m` if memory is tight (the two models take about 7 GB).
 
+- Practice question (`assistant/services/model_readiness.py`): even after a model is loaded, its first real use of the router and judge prompts is slow once (about 4 and 2 seconds). Start-up sends a practice question through both. Measured with the real app: the router and the help search then take 0.2 and 0.9 seconds on the first question instead of 4.1 and 2.5.
+- The help search tool alone gets a 5-second limit (`timeout_seconds` on the tool); every other tool keeps 2 seconds.
+
+Known gap: the first answer after a restart still takes about 7 to 12 seconds to its first word, then 0.5 to 2 seconds. The cause is the long chat prompt being processed from scratch (it starts with the customer's first name, so no two customers share the start). A practice answer did not help, so it was not kept.
+
 Production differs: a hosted model or an always-on inference server never unloads, so there is nothing to keep alive. The warm-up uses Ollama-only endpoints, so drop it when switching providers.
 
-Run the tests with `uv run pytest` (197 tests). They use the `ledger_core_test` and `assistant_test` databases, so demo data is never touched.
+Run the tests with `uv run pytest` (202 tests). They use the `ledger_core_test` and `assistant_test` databases, so demo data is never touched.
 
 Changing a table: edit the model, run `uv run alembic -c <service>/alembic.ini revision --autogenerate -m "what changed"`, review the generated file, then `upgrade head`.
 
