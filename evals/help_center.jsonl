@@ -13,7 +13,7 @@
 {"id": "hc-13", "question": "Will I owe a penalty if I pull money out of my IRA?", "expected_source": "retirement-accounts.md", "expected_heading": "Taking money out of an IRA"}
 {"id": "hc-14", "question": "Is there a yearly cost for a retirement account?", "expected_source": "retirement-accounts.md", "expected_heading": "IRA fee"}
 {"id": "hc-15", "question": "Why can't I withdraw from my account, it says restricted?", "expected_source": "retirement-accounts.md", "expected_heading": "Restricted accounts"}
-{"id": "hc-16", "question": "What does a 1099-B show?", "expected_source": "tax-documents.md", "expected_heading": "Which forms you may receive"}
+{"id": "hc-16", "question": "What does a 1099-B show?", "expected_source": "tax-documents.md", "expected_heading": "1099-B: sales of stocks and funds"}
 {"id": "hc-17", "question": "When will my tax forms be ready?", "expected_source": "tax-documents.md", "expected_heading": "When forms are ready"}
 {"id": "hc-18", "question": "Where do I download my tax paperwork?", "expected_source": "tax-documents.md", "expected_heading": "Where to find yours"}
 {"id": "hc-19", "question": "Can you tell me how to report my gains on my tax return?", "expected_source": "tax-documents.md", "expected_heading": "Tax advice"}
@@ -22,6 +22,7 @@
 {"id": "hc-22", "question": "How can I speak to a human?", "expected_source": "account-and-security.md", "expected_heading": "Talking to a person"}
 {"id": "hc-23", "question": "Does the assistant make changes on its own?", "expected_source": "account-and-security.md", "expected_heading": "Changes need your approval"}
 {"id": "hc-24", "question": "When will I get my 1099-B?", "expected_source": "tax-documents.md", "expected_heading": "When forms are ready"}
+{"id": "hc-25", "question": "What is a 5498 form for?", "expected_source": "tax-documents.md", "expected_heading": "5498: IRA contributions"}
 {"id": "off-01", "question": "Which stock should I buy right now?", "expected_source": null, "expected_heading": null}
 {"id": "off-02", "question": "What's the weather in Chicago today?", "expected_source": null, "expected_heading": null}
 {"id": "off-03", "question": "Write me a poem about the ocean.", "expected_source": null, "expected_heading": null}
