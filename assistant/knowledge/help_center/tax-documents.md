@@ -1,9 +1,13 @@
 # Tax documents
 
-## Which forms you may receive
-- 1099-B reports the sales of stocks and funds in a taxable account.
-- 1099-DIV reports dividends paid to a taxable account.
-- 5498 reports contributions to an IRA.
+## 1099-B: sales of stocks and funds
+1099-B reports the sales of stocks and funds in a taxable account.
+
+## 1099-DIV: dividends
+1099-DIV reports dividends paid to a taxable account.
+
+## 5498: IRA contributions
+5498 reports contributions to an IRA, the money you put into a retirement account during the year. It is usually available in May.
 
 ## When forms are ready
 Forms for a tax year are prepared early in the following year. The 1099 forms are usually available in February, and the 5498 in May. The exact date for each of your forms is in your tax documents list. Until then a form shows as pending. A form can be marked corrected if it was reissued; use the corrected version.
