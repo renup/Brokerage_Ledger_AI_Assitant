@@ -83,7 +83,8 @@ def chat(client, session_id="s1", message="hi"):
 def test_chat_streams_tokens_then_done_and_saves_both_messages(client_as):
     client = client_as(MAYA)
     events = parse_sse(chat(client).text)
-    assert [e for e, _ in events] == ["token", "token", "token", "done"]
+    # The answer guard holds the words back until the sentence ends, so "Hello there!" arrives in one piece
+    assert [e for e, _ in events] == ["token", "done"]
     history = client.get("/sessions/s1").json()
     assert [(m["role"], m["text"]) for m in history] == [("user", "hi"), ("assistant", "Hello there!")]
 
@@ -169,3 +170,21 @@ def test_tool_call_with_a_customer_id_is_refused_and_never_reaches_ledger_core(c
 
     assert ledger.calls == []
     assert "Invalid arguments" in seen_by_model[1][-1]["content"]
+
+
+# The model is told to send a link; the customer must see the stopped message, and that is what is saved
+def test_a_link_in_the_answer_is_replaced_and_never_reaches_the_customer_or_the_history(client_as, monkeypatch):
+    async def poisoned_stream(messages, tools=None):
+        for piece in ["Transfers take 5 days. ", "Please visit ", "http://verify-ledger.example.com", " now. ", "Thanks."]:
+            yield piece
+
+    monkeypatch.setattr(llm, "stream_turn", poisoned_stream)
+    client = client_as(MAYA)
+    body = chat(client).text
+    assert "verify-ledger" not in body
+    shown = "".join(data["text"] for event, data in parse_sse(body) if event == "token")
+    assert shown.startswith("Transfers take 5 days. ")
+    assert "can't finish that answer" in shown
+    assert "Thanks" not in shown
+    saved = client.get("/sessions/s1").json()[-1]["text"]
+    assert "verify-ledger" not in saved

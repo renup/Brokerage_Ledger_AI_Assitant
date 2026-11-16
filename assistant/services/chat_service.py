@@ -25,6 +25,7 @@ from assistant.clients.embeddings import embed_texts_for_search
 from assistant.repositories.help_passages import HelpPassageRepository
 from assistant.services.help_center_service import HelpCenterService
 from assistant.services.passage_judge import keep_only_passages_that_answer
+from assistant.services.answer_guard import AnswerGuard
 
 from assistant.clients.ledger import LedgerClient
 from assistant.services.agent import ToolRound, ToolStarted, run_agent
@@ -103,6 +104,7 @@ class ChatService:
         pending = PendingAnnouncements()
         context = self._build_tool_context(session_id, owner, pending)
 
+        guard = AnswerGuard()
         parts = []
         # Each round of lookups the agent reports. Saved with the reply so later turns know the real ids.
         rounds = []
@@ -120,8 +122,12 @@ class ChatService:
                     for announcement in self._announcements_after_round(pending):
                         yield announcement
                 else:
-                    parts.append(event.text)
-                    yield sse("token", {"text": event.text})
+                    for safe_text in guard.release_completed_sentences(event.text):
+                        parts.append(safe_text)
+                        yield sse("token", {"text": safe_text})
+            for safe_text in guard.release_unfinished_sentence():
+                parts.append(safe_text)
+                yield sse("token", {"text": safe_text})
         except Exception:
             # Log the real cause for us; tell the client only something safe
             logger.exception("Model call failed (trace_id=%s)", trace_id)

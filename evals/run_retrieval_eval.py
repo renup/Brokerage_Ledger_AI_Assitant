@@ -3,6 +3,7 @@ import json
 import statistics
 import time
 from pathlib import Path
+import argparse
 
 from sqlmodel import Session
 
@@ -12,14 +13,14 @@ from assistant.repositories.help_passages import HelpPassageRepository
 from assistant.services.help_center_service import MAX_DISTANCE, QUESTION_LABEL, FoundPassage
 from assistant.services.passage_judge import keep_only_passages_that_answer
 
-DATASET = Path(__file__).parent / "help_center.jsonl"
+DEFAULT_DATASET = Path(__file__).parent / "help_center.jsonl"
 # Cut-offs to compare, so MAX_DISTANCE is chosen from measurements and not guessed
 CANDIDATE_CUTOFFS = [0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60]
 
 
 # Finds, for each question, the three nearest passages and how far each is. Needs the help center to be indexed.
-async def measure_retrieval() -> list[dict]:
-    cases = [json.loads(line) for line in DATASET.read_text().splitlines() if line.strip()]
+async def measure_retrieval(dataset: Path = DEFAULT_DATASET) -> list[dict]:
+    cases = [json.loads(line) for line in dataset.read_text().splitlines() if line.strip()]
     vectors = await embed_texts_for_search([QUESTION_LABEL + case["question"] for case in cases])
     results = []
     with Session(engine) as db:
@@ -107,6 +108,9 @@ async def report_judge(results: list[dict]) -> None:
 
 
 if __name__ == "__main__":
-    measured = asyncio.run(measure_retrieval())
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", type=Path, default=DEFAULT_DATASET)
+    chosen = parser.parse_args()
+    measured = asyncio.run(measure_retrieval(chosen.dataset))
     report(measured)
     asyncio.run(report_judge(measured))
