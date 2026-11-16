@@ -1,5 +1,9 @@
 import logging
 import re
+from decimal import Decimal
+from functools import lru_cache
+
+from assistant.knowledge.passages import load_help_center_passages
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +25,44 @@ UNSAFE_ANSWER_PATTERNS = {
 # A sentence that warns ("never share your password") mentions a secret without asking for one
 WARNING_WORDS = r"\b(never|do not|don't|won't|will not)\b"
 
+# A number as written in text: 25,000 or 1200.50 or 7. The $ and % signs are looked at separately.
+EVERY_NUMBER = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")
+# A code such as QUIET-FEE-0 or HO-4471: capital-letter pieces joined by hyphens. No IGNORECASE on purpose,
+# so ordinary hyphenated words are not mistaken for codes.
+CODE = re.compile(r"\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+\b")
+
+
+# One way to write a number, so $25,000 and 25000 and 25,000.00 compare as equal
+def normalise_number(written: str) -> str:
+    return format(Decimal(written.replace(",", "")).normalize(), "f")
+
+
+# Only some numbers are checked in an answer: money, percentages, numbers with a thousands comma and numbers of four
+# or more digits. Small plain numbers ("3 business days") are NOT checked: they are everywhere in real answers.
+def is_checked_number(sentence: str, number: re.Match) -> bool:
+    written = number.group()
+    before = sentence[: number.start()].rstrip()
+    after = sentence[number.end():]
+    return before.endswith("$") or after.startswith("%") or "," in written or len(written.split(".")[0]) >= 4
+
+
+# The figures and codes in an answer sentence that must be backed by a trusted source
+def checked_figures_in(sentence: str) -> list[str]:
+    numbers = [normalise_number(m.group()) for m in EVERY_NUMBER.finditer(sentence) if is_checked_number(sentence, m)]
+    return numbers + CODE.findall(sentence)
+
+
+# Every number and code in a trusted text, small ones too: a trusted source may back any figure it contains
+def every_figure_in(text: str) -> set[str]:
+    return {normalise_number(m.group()) for m in EVERY_NUMBER.finditer(text)} | set(CODE.findall(text))
+
+
+# The figures in the real help articles on disk (the firm's own text), read once. The passages the search returns are
+# NOT used: a poisoned passage must not be able to vouch for its own fake figure.
+@lru_cache
+def figures_in_the_real_help_articles() -> frozenset[str]:
+    return frozenset(every_figure_in(" ".join(f"{p.heading} {p.text}" for p in load_help_center_passages())))
+
 
 # The reason a sentence is unsafe to show a customer, or None when it is fine
 def find_unsafe_reason(sentence: str) -> str | None:
@@ -38,7 +80,21 @@ class AnswerGuard:
     def __init__(self):
         # Words received that do not yet form a complete sentence
         self._unchecked_words = ""
+        # Figures and codes an answer may mention: the real articles, plus whatever is added with trust_figures_in
+        self._trusted_figures = set(figures_in_the_real_help_articles())
         self.stopped_because: str | None = None
+
+    # Adds the figures in this text to what the answer may mention. Used for the customer's own words and for ledger
+    # tool results; never for help passages.
+    def trust_figures_in(self, text: str) -> None:
+        self._trusted_figures |= every_figure_in(text)
+
+    # The first figure or code in the sentence that no trusted source backs, as a reason; None when all are backed
+    def _find_unsupported_figure(self, sentence: str) -> str | None:
+        for figure in checked_figures_in(sentence):
+            if figure not in self._trusted_figures:
+                return f"contains a figure or code that no account data or help article backs ({figure})"
+        return None
 
     # Takes the newest words from the model; returns the complete sentences that are safe to show now
     def release_completed_sentences(self, new_words: str) -> list[str]:
@@ -60,7 +116,7 @@ class AnswerGuard:
         return [self._release_or_stop_the_answer(sentence)]
 
     def _release_or_stop_the_answer(self, sentence: str) -> str:
-        reason = find_unsafe_reason(sentence)
+        reason = find_unsafe_reason(sentence) or self._find_unsupported_figure(sentence)
         if reason is None:
             return sentence
         self.stopped_because = reason
