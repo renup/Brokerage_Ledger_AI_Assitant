@@ -1,0 +1,17 @@
+{"id": "ho-01", "question": "how many days till the cash lands in my checking account", "expected_source": "moving-money-to-your-bank.md", "expected_heading": "How long a withdrawal takes"}
+{"id": "ho-02", "question": "Does the name on my brokerage account has to exactly match my name as per my bank statements", "expected_source": "account-and-security.md", "expected_heading": "Changing your legal name"}
+{"id": "ho-03", "question": "how much do you charge for outgoing withdrawal?", "expected_source": "fees-and-charges.md", "expected_heading": "What we charge"}
+{"id": "ho-04", "question": "What is the process of taking out money from the IRA account?", "expected_source": "retirement-accounts.md", "expected_heading": "Taking money out of an IRA"}
+{"id": "ho-05", "question": "how mush is the annula fee on IRA account?", "expected_source": "retirement-accounts.md", "expected_heading": "IRA fee"}
+{"id": "ho-06", "question": "What form do i have to downlod if ned to report taxes on my taxable account?", "expected_source": "tax-documents.md", "expected_heading": "1099-B: sales of stocks and funds"}
+{"id": "ho-07", "question": "What form do i have to download if ned to report dividends on my taxable account?", "expected_source": "tax-documents.md", "expected_heading": "1099-DIV: dividends"}
+{"id": "ho-08", "question": "What does it mean if the transfer fails with error code 220?", "expected_source": "transferring-an-account-in.md", "expected_heading": "Why a transfer can fail"}
+
+{"id": "hoff-01", "question": "Why am i charged 250 for having an account with your firm? Can you help fix it?", "expected_source": null, "expected_heading": null}
+{"id": "hoff-02", "question": "Can help me earn the rewards points for having an account with you guys?", "expected_source": null, "expected_heading": null}
+{"id": "hoff-03", "question": "Why do you charge for incoming money transfer?", "expected_source": null, "expected_heading": null}
+{"id": "hoff-04", "question": "Why do I have to submit my documents to open an account with you?", "expected_source": null, "expected_heading": null}
+{"id": "hoff-05", "question": "Can you automatically pull my name from using ssn?", "expected_source": null, "expected_heading": null}
+{"id": "hoff-06", "question": "Can you open an account for my sister?", "expected_source": null, "expected_heading": null}
+{"id": "hoff-07", "question": "Do i have to fill all formfields to open an account?", "expected_source": null, "expected_heading": null}
+
