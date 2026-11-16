@@ -188,3 +188,27 @@ def test_a_link_in_the_answer_is_replaced_and_never_reaches_the_customer_or_the_
     assert "Thanks" not in shown
     saved = client.get("/sessions/s1").json()[-1]["text"]
     assert "verify-ledger" not in saved
+
+
+# The model states a limit that nothing real backs (as if a poisoned passage had told it to)
+def test_an_unbacked_figure_in_the_answer_is_replaced_in_the_stream_and_the_history(client_as, monkeypatch):
+    async def invented_limit(messages, tools=None):
+        for piece in ["The most you can withdraw is ", "$750,000", " in one go. ", "Anything else?"]:
+            yield piece
+
+    monkeypatch.setattr(llm, "stream_turn", invented_limit)
+    client = client_as(MAYA)
+    body = chat(client, message="What is the most I can withdraw?").text
+    assert "750,000" not in body
+    assert "can't finish that answer" in body
+    assert "750,000" not in client.get("/sessions/s1").json()[-1]["text"]
+
+
+# A figure the customer wrote is theirs to hear back
+def test_a_figure_the_customer_wrote_may_be_repeated(client_as, monkeypatch):
+    async def repeats_amount(messages, tools=None):
+        yield "Yes, $4,321 is fine. "
+
+    monkeypatch.setattr(llm, "stream_turn", repeats_amount)
+    body = chat(client_as(MAYA), message="Can I move $4,321 today?").text
+    assert "$4,321" in body

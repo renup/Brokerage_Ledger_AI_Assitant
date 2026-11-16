@@ -105,6 +105,11 @@ class ChatService:
         context = self._build_tool_context(session_id, owner, pending)
 
         guard = AnswerGuard()
+        # What the customer and the assistant already said counts as trusted: an answer may repeat a figure they wrote
+        for message in messages:
+            if message["role"] in ("user", "assistant"):
+                guard.trust_figures_in(str(message.get("content") or ""))
+
         parts = []
         # Each round of lookups the agent reports. Saved with the reply so later turns know the real ids.
         rounds = []
@@ -119,6 +124,11 @@ class ChatService:
                 elif isinstance(event, ToolRound):
                     # Kept so we can save it with the reply
                     rounds.append(event)
+                    # Ledger results back the figures in an answer. Help passages do NOT: a poisoned passage
+                    # would vouch for its own fake figure.
+                    for record in event.records:
+                        if record.name != "search_help_center":
+                            guard.trust_figures_in(record.result)
                     for announcement in self._announcements_after_round(pending):
                         yield announcement
                 else:

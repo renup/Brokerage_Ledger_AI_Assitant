@@ -8,6 +8,7 @@ from pathlib import Path
 
 from assistant.clients.embeddings import embed_texts_for_search
 from assistant.config import settings
+from assistant.services.answer_guard import AnswerGuard
 from assistant.llm import ToolCall, stream_turn, tool_request_message, tool_result_message
 from assistant.services.chat_service import ChatService
 from assistant.services.tool_router import ToolRouter, required_calls_for
@@ -72,6 +73,15 @@ async def answer_like_the_app(question: str, search_help) -> tuple[str, list[dic
     return "".join(words), passages, route
 
 
+# What the customer would have seen if the answer had passed through the answer guard, and why it was stopped (or None).
+# The customer's own question is trusted, as in the real app; there is no ledger in these evals.
+def answer_after_the_guard(question: str, answer: str) -> tuple[str, str | None]:
+    guard = AnswerGuard()
+    guard.trust_figures_in(question)
+    shown = guard.release_completed_sentences(answer) + guard.release_unfinished_sentence()
+    return "".join(shown), guard.stopped_because
+
+
 # Checks one answer. Returns the list of problems (empty = good).
 def find_problems(case: dict, answer: str, passages: list[dict]) -> list[str]:
     problems = []
@@ -122,7 +132,10 @@ async def run(cases: list[dict], runs: int) -> list[dict]:
         attempts = []
         for _ in range(runs):
             answer, passages, route = await answer_like_the_app(case["question"], search_help)
-            attempts.append({"route": route, "answer": answer, "problems": find_problems(case, answer, passages)})
+            # Measured, not scored: a real answer the guard would stop is a false stop
+            _, guard_stopped_because = answer_after_the_guard(case["question"], answer)
+            attempts.append({"route": route, "answer": answer, "problems": find_problems(case, answer, passages),
+                             "guard_stopped_because": guard_stopped_because})
         results.append({"id": case["id"], "question": case["question"], "attempts": attempts})
 
         passed = sum(not a["problems"] for a in attempts)
@@ -131,6 +144,8 @@ async def run(cases: list[dict], runs: int) -> list[dict]:
         for attempt in attempts:
             if attempt["problems"]:
                 print(f"        {attempt['problems']}  answer: {attempt['answer'][:110]!r}")
+            if attempt["guard_stopped_because"]:
+                print(f"        GUARD WOULD STOP: {attempt['guard_stopped_because']}  answer: {attempt['answer'][:160]!r}")
     return results
 
 
@@ -145,6 +160,8 @@ def main() -> int:
     attempts = [a for r in results for a in r["attempts"]]
     score = round(100 * sum(not a["problems"] for a in attempts) / len(attempts), 1)
     print(f"\nanswer quality {score}")
+    false_stops = sum(bool(a["guard_stopped_because"]) for a in attempts)
+    print(f"answers the guard would wrongly stop: {false_stops}/{len(attempts)}")
 
     results_dir = Path(__file__).parent / "results"
     results_dir.mkdir(exist_ok=True)

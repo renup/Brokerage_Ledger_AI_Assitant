@@ -1,6 +1,14 @@
 import pytest
 
-from assistant.services.answer_guard import ANSWER_STOPPED_MESSAGE, AnswerGuard, find_unsafe_reason
+from assistant.services.answer_guard import (
+    ANSWER_STOPPED_MESSAGE,
+    AnswerGuard,
+    checked_figures_in,
+    every_figure_in,
+    figures_in_the_real_help_articles,
+    find_unsafe_reason,
+    normalise_number,
+)
 
 
 # Feeds the pieces to a guard the way the model streams them, and returns everything the customer would see
@@ -60,3 +68,55 @@ def test_sentences_before_the_unsafe_one_are_kept_and_the_rest_is_dropped():
 def test_an_unsafe_last_sentence_without_a_full_stop_is_caught_at_the_end():
     shown, _ = shown_to_customer(["Fine. ", "Email help@bad-site.com"])
     assert shown == ["Fine. ", ANSWER_STOPPED_MESSAGE]
+
+
+# --- figures and codes: an answer may only state what a trusted source backs ---
+
+@pytest.mark.parametrize("written, expected", [
+    ("25,000", "25000"), ("25,000.00", "25000"), ("25000", "25000"), ("1,200.50", "1200.5"), ("7", "7"),
+])
+def test_one_figure_written_different_ways_compares_equal(written, expected):
+    assert normalise_number(written) == expected
+
+
+def test_only_money_percentages_and_large_numbers_and_codes_are_checked():
+    assert checked_figures_in("Pay $5 or 3 business days or 2.5% or 7,500 or 12000 or QUIET-FEE-0 or e-mail.") == [
+        "5", "2.5", "7500", "12000", "QUIET-FEE-0"]
+
+
+def test_every_number_in_a_trusted_text_is_trusted_even_small_ones():
+    assert every_figure_in('{"amount": 500.0, "id": 7, "reference": "HO-4471"}') == {"500", "7", "4471", "HO-4471"}
+
+
+def test_the_real_help_article_limit_is_trusted():
+    assert "25000" in figures_in_the_real_help_articles()
+
+
+def test_a_figure_no_source_backs_stops_the_answer():
+    shown, guard = shown_to_customer(["The limit is $750,000. ", "Anything else."])
+    assert shown == [ANSWER_STOPPED_MESSAGE]
+    assert "750000" in guard.stopped_because
+
+
+def test_a_code_no_source_backs_stops_the_answer():
+    shown, _ = shown_to_customer(["Quote QUIET-FEE-0 for no fee. "])
+    assert shown == [ANSWER_STOPPED_MESSAGE]
+
+
+def test_the_real_article_limit_passes_in_any_spelling():
+    shown, guard = shown_to_customer(["The most is $25,000 or 25000 dollars. "])
+    assert shown == ["The most is $25,000 or 25000 dollars. "]
+    assert guard.stopped_because is None
+
+
+def test_figures_from_ledger_results_and_the_customers_words_are_backed():
+    guard = AnswerGuard()
+    guard.trust_figures_in('{"balance": 1200.5, "reference": "HO-4471"}')
+    guard.trust_figures_in("I want to move $5,000")
+    shown = guard.release_completed_sentences("Balance $1,200.50, ref HO-4471, moving $5,000. ")
+    assert shown == ["Balance $1,200.50, ref HO-4471, moving $5,000. "]
+
+
+def test_one_unbacked_figure_stops_a_sentence_that_also_has_a_real_one():
+    shown, _ = shown_to_customer(["The limit is $25,000 and the bonus is $9,999. "])
+    assert shown == [ANSWER_STOPPED_MESSAGE]
