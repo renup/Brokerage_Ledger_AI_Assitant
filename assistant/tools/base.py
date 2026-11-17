@@ -39,12 +39,17 @@ HelpSearcher = Callable[[str], Awaitable[list[dict]]]
 #            only the propose tools use it.
 #   hand_off: records a hand-off to a human. None where it makes no sense (e.g. in evals).
 #   search_help: finds help-center passages for a question. None where it makes no sense (e.g. in evals).
+#   customer_words: what the customer has written so far, for tools that must not accept a value the model invented.
 @dataclass(frozen=True)
 class ToolContext:
     ledger: LedgerClient
     propose: ProposalSaver | None = None
     hand_off: HandoffRecorder | None = None
     search_help: HelpSearcher | None = None
+    # Everything the customer has written in this conversation, one message per line. Tools that act on a value
+    # the customer must supply (a new legal name) check it appears here, so the model cannot make one up.
+    # None where it makes no sense (e.g. in evals): the check is then skipped.
+    customer_words: str | None = None
 
 
 # The kinds of help a customer message can need. The router picks the groups a message needs, and the

@@ -25,6 +25,14 @@ async def propose_legal_name_change(context: ToolContext, args: ProposeLegalName
     if not new_name:
         return {"proposed": False, "reason": "The new legal name is empty."}
 
+    # The new name must be one the customer typed. The model once invented "Maya Rose Patel" for a customer who had
+    # not given a name, so the check is made here in code and not left to the prompt. Capitals and extra spaces
+    # do not matter.
+    if context.customer_words is not None:
+        said = " ".join(context.customer_words.lower().split())
+        if " ".join(new_name.lower().split()) not in said:
+            return {"proposed": False, "reason": "The customer has not given this new name. Ask them to type the new legal name."}
+
     # Read the name on file: it goes in the summary, and the approval step compares against it
     # to notice if the name changed in the meantime
     current_name = (await context.ledger.profile())["legal_name"]
