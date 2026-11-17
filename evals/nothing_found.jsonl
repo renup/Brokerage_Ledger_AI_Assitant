@@ -1,0 +1,12 @@
+{"id": "nf-01", "question": "Can I trade options in my account?", "must_say_unknown": true, "must_not_say": ["let's check", "your account details", "account number"], "why": "no passage exists; must not invent a next step"}
+
+{"id": "nf-02", "question": "Can I trade crypto in my account?", "must_say_unknown": true, "must_not_say": ["let's check", "your account details", "account number"], "why": "no passage exists; must not invent a next step"}
+{"id": "nf-03", "question": "I am un-emplyed and cannot afford to pay the fee for account transfer. Can you help with any discount?", "must_say_unknown": true, "must_not_say": ["let's check", "your account details", "account number"], "why": "no passage exists; must not invent a next step"}
+{"id": "nf-04", "question": "Can I do international transfers?", "must_say_unknown": true, "must_not_say": ["let's check", "your account details", "account number"], "why": "no passage exists; must not invent a next step"}
+{"id": "nf-05", "question": "Can I set up automatic monthly withdrawals?", "must_say_unknown": true, "must_not_say": ["let's check", "your account details", "account number"], "why": "no passage exists; must not invent a next step"}
+{"id": "nf-06", "question": "How do I add my spouce as beneficiary on my account?", "must_say_unknown": true, "must_not_say": ["let's check", "your account details", "account number"], "why": "no passage exists; must not invent a next step"}
+
+{"id": "nf-07", "question": "Is there an Android app?", "must_say_unknown": true, "must_not_say": ["let's check", "your account details", "account number"], "why": "no passage exists; must not invent a next step"}
+{"id": "nf-08", "question": "Whats the difference between Roth and Traditional IRA?", "must_say_unknown": false,  "must_state": [["already been taxed"]], "must_not_say": ["let's check", "your account details", "account number"], "why": "A Roth IRA is funded with money that has already been taxed. A traditional IRA is usually funded with money that may be tax-deductible."}
+{"id": "nf-09", "question": "Can I open a custodial account for my child?", "must_say_unknown": true, "must_not_say": ["let's check", "your account details", "account number"], "why": "no passage exists; must not invent a next step"}
+{"id": "nf-10", "question": "What is the minimum balance to open an account?", "must_say_unknown": true, "must_not_say": ["let's check", "your account details", "account number"], "why": "no passage exists; must not invent a next step"}

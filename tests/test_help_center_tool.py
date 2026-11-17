@@ -18,6 +18,7 @@ from assistant.services.help_center_service import HelpCenterService
 from assistant.tools import ALL_TOOLS
 from assistant.tools.base import ToolContext, ToolGroup
 from assistant.tools.registry import ToolRegistry
+from assistant.services.tool_router import NOTHING_FOUND_REPLY
 from tests.helpers import NoRouting
 from tests.test_action_service import FakeLedger
 from tests.test_assistant import MAYA, parse_sse
@@ -263,5 +264,7 @@ def test_passages_the_judge_rejects_are_not_given_to_the_model_or_announced_as_s
         assistant_app.dependency_overrides.clear()
 
     assert "sources" not in [name for name, _ in events]
-    tool_results = [m["content"] for m in seen[0] if m["role"] == "tool"]
-    assert len(tool_results) == 1 and "Do not answer from memory" in tool_results[0]
+    # Nothing survived the judge on a help-only route, so our code answers and the model is never asked
+    assert seen == []
+    shown = "".join(data["text"] for name, data in events if name == "token")
+    assert shown == NOTHING_FOUND_REPLY

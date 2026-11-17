@@ -1,4 +1,5 @@
 import asyncio
+import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -42,6 +43,12 @@ class ToolRound:
     at: str
 
 
+# True when every lookup result says the help center found nothing. An error result ("took too long") is not
+# "nothing found": the model must tell the customer to try again, so it is left to the model.
+def help_search_found_nothing(results: list[str]) -> bool:
+    return bool(results) and all(json.loads(result).get("data", {}).get("found") is False for result in results)
+
+
 # The model -> tools -> model loop. "messages" is the conversation so far (rules + history).
 #
 # Think of it as a conversation with a very capable assistant who cannot open your files:
@@ -58,6 +65,7 @@ async def run_agent(
     registry: ToolRegistry,
     context: ToolContext,
     required_calls: list[ToolCall] | None = None,
+    reply_when_help_finds_nothing: str | None = None,
 ) -> AsyncIterator[Token | ToolStarted | ToolRound]:
     # Work on a copy, so tool calls and results don't leak into the caller's list
     conversation = list(messages)
@@ -121,3 +129,8 @@ async def run_agent(
 
         # Report the whole round now that every result is in
         yield ToolRound(tuple(records), datetime.now(timezone.utc).isoformat(timespec="seconds"))
+
+        # The required search found nothing and the route allows a fixed reply: answer with it, without the model
+        if round_number == 0 and required_calls and reply_when_help_finds_nothing and help_search_found_nothing(results):
+            yield Token(reply_when_help_finds_nothing)
+            return
