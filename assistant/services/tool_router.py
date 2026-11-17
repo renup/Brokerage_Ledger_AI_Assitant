@@ -18,6 +18,10 @@ ROUTER_MESSAGE_CHARS = 300
 # The router's answer when no tool is needed at all
 NO_TOOLS_WORD = "none"
 
+# What the customer is told when a help-only question finds nothing in the help center. Sent by our code, because
+# the model kept adding invented next steps ("let's check your account details") to its own wording.
+NOTHING_FOUND_REPLY = "I'm sorry, I don't have that information. I can connect you with a person if you would like."
+
 
 # Reads the router's instructions the first time they are needed, then reuses them
 @lru_cache
@@ -60,6 +64,12 @@ def required_calls_for(groups: set[ToolGroup] | None, messages: list[dict]) -> l
         return []
     question = json.dumps({"question": last_customer_message(messages)})
     return [llm.ToolCall(id="required-help-search", name="search_help_center", arguments=question)]
+
+
+# The reply our code sends if the required help search finds nothing, or None when the model should still answer.
+# Only a help-only route gets one: with another route as well (for example fees), the other lookup may still answer.
+def fixed_reply_for(groups: set[ToolGroup] | None) -> str | None:
+    return NOTHING_FOUND_REPLY if groups == {ToolGroup.HELP_CENTER} else None
 
 
 # Decides which tools the model is offered for a message. Offering 3 to 6 tools instead of all of

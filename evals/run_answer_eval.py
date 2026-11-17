@@ -11,7 +11,8 @@ from assistant.config import settings
 from assistant.services.answer_guard import AnswerGuard
 from assistant.llm import ToolCall, stream_turn, tool_request_message, tool_result_message
 from assistant.services.chat_service import ChatService
-from assistant.services.tool_router import ToolRouter, required_calls_for
+from assistant.services.agent import help_search_found_nothing
+from assistant.services.tool_router import ToolRouter, fixed_reply_for, required_calls_for
 from assistant.tools import ALL_TOOLS
 from assistant.tools.base import ToolContext
 from assistant.tools.registry import ToolRegistry
@@ -26,7 +27,7 @@ ROUTER = ToolRouter()
 ADMITS_IT_DOES_NOT_KNOW = [
     "don't have", "do not have", "doesn't say", "does not say", "not sure", "no information",
     "can't find", "cannot find", "unable to", "not able to", "can't help with", "cannot help with",
-    "can only help", "only help with", "connect you", "speak to a person", "talk to a person",
+    "doesn't have", "does not have", "can only help", "only help with", "connect you", "speak to a person", "talk to a person",
 ]
 
 
@@ -64,6 +65,10 @@ async def answer_like_the_app(question: str, search_help) -> tuple[str, list[dic
             messages.append(tool_result_message(call.id, result))
             # The registry wraps a successful result as {"tool", "note", "data": {...}}; the passages are inside "data"
             passages += json.loads(result).get("data", {}).get("passages", [])
+        # The app answers a help-only question that found nothing with a fixed reply and never asks the model
+        fixed_reply = fixed_reply_for(groups)
+        if fixed_reply and help_search_found_nothing(results):
+            return fixed_reply, passages, route
 
     words = []
     async for item in stream_turn(messages, registry.definitions()):
@@ -95,6 +100,11 @@ def find_problems(case: dict, answer: str, passages: list[dict]) -> list[str]:
     for wordings in case.get("must_state", []):
         if not any(wording.lower() in lowered for wording in wordings):
             problems.append(f"missing fact: {wordings[0]!r}")
+
+    # Phrases that show the model invented something (a next step, a screen, a request for details it should not need)
+    for phrase in case.get("must_not_say", []):
+        if phrase.lower() in lowered:
+            problems.append(f"said {phrase!r}")
 
     if case.get("must_say_unknown") and not any(phrase in lowered for phrase in ADMITS_IT_DOES_NOT_KNOW):
         problems.append("did not admit it has no information")

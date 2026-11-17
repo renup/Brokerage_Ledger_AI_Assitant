@@ -1,0 +1,1 @@
+{"id": "ref-01", "question": "Do you know if hte stock market is open on Black fridays?", "must_say_unknown": true, "must_not_say": ["typically open", "usually operates", "9:30"], "why": "market information is not in the help center and not ours to state; must not answer from general knowledge"}

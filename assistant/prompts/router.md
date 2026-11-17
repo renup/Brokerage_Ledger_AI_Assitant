@@ -2,7 +2,7 @@ You route a customer's message in a brokerage app. Reply with one or more of the
 
 account - looking up the customer's own accounts, balances, withdrawals or transfers, or the status of any of them, or whether they could withdraw an amount
 reference - what things cost (fees and charges), where the customer's own tax documents are, what an error code means, or on what date the customer's own money will arrive
-help - general questions about how things work at this firm (rules, limits, how long a kind of process usually takes, what an account type, a tax form or a term means), never about the customer's own items
+help - general questions about how things work at this firm (rules, limits, how long a kind of process usually takes, what an account type, a tax form or a term means, or whether the firm has an app or a feature), never about the customer's own items
 change - the customer asks to retry a transfer, cancel a withdrawal, or change their legal name
 human - the customer asks for a person, wants to complain or dispute something, or needs something nothing else here can do, needs help with account closing
 none - thanks, a greeting, small talk, a request for investment advice, or anything unrelated to the brokerage
@@ -47,6 +47,9 @@ Examples:
 - "what hours is your support open?" -> help
 - "how long does it usually take to move an account over from another broker?" -> help
 - "what usually makes a transfer fail?" -> help
+- "do you have an app for tablets?" -> help
+- "do you offer margin accounts?" -> help
+- "is there a live chat on the website?" -> help
 - "which stock should I buy?" -> none
 - "what's the weather like?" -> none
 - "thanks!" -> none
