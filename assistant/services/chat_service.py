@@ -53,6 +53,12 @@ def system_prompt() -> str:
     return (Path(__file__).parent.parent / "prompts" / "system.md").read_text()
 
 
+# Everything the customer wrote in this conversation, one message per line, in order. Their words only: not the rules,
+# not the assistant's replies, not tool results. Used to check that a value a tool acts on came from the customer.
+def customer_words_in(messages: list[dict]) -> str:
+    return "\n".join(m["content"] for m in messages if m["role"] == "user" and m.get("content"))
+
+
 # All the chat logic. It knows nothing about HTTP: routers call it, it calls the repository
 # and the model. "repo" is this request's repository; "ledger" makes calls to ledger-core as this
 # caller; "registry" is the shared tool menu; "session_factory" opens a fresh database session
@@ -102,7 +108,7 @@ class ChatService:
 
         # Filled by the tools while they run, announced to the app after each round
         pending = PendingAnnouncements()
-        context = self._build_tool_context(session_id, owner, pending)
+        context = self._build_tool_context(session_id, owner, pending, messages)
 
         guard = AnswerGuard()
         # What the customer and the assistant already said counts as trusted: an answer may repeat a figure they wrote
@@ -154,12 +160,13 @@ class ChatService:
     # Gives the tools everything they need to reach the outside world: the ledger, and one function each
     # for saving a proposal, handing off to a person and searching the help center. The two that
     # produce something to announce write into "pending".
-    def _build_tool_context(self, session_id: str, owner: str, pending: PendingAnnouncements) -> ToolContext:
+    def _build_tool_context(self, session_id: str, owner: str, pending: PendingAnnouncements, messages: list[dict]) -> ToolContext:
         return ToolContext(
             self.ledger,
             self._proposal_saver(session_id, owner, pending.proposals),
             self._handoff_function_for_tools(session_id, owner),
             self._help_search_function_for_tools(pending.article_names),
+            customer_words_in(messages),
         )
 
     # After a round of lookups: the SSE events for whatever the tools produced in it, then the lists are

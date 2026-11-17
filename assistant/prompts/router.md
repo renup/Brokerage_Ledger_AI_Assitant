@@ -13,6 +13,8 @@ Rules:
 - A message can need several kinds of help. Answer with all of them, for example "account, reference".
 - Asking whether something is done, delayed or failed is "account", even when it is short or misspelled.
 - A follow-up about something the customer already asked about, such as "any news on it?" or "what went wrong with that one?", is "account" only.
+- Questions about what the firm offers or pays (interest, savings products, cards, apps) are "help", even if the answer is that it does not offer it. They are not "reference" (which is only fees and the other items listed above) and not "none".
+- A how-do-I question about changing something, where the customer gives no new value, is "help". Only a request to do the change, with the new value, is "change".
 - Asking about another person's accounts is "none".
 - When unsure between none and another word, choose the other word.
 - Closing an account is always human, even when the message also mentions transfers or moving assets.
@@ -50,6 +52,9 @@ Examples:
 - "do you have an app for tablets?" -> help
 - "do you offer margin accounts?" -> help
 - "is there a live chat on the website?" -> help
+- "how much interest do you pay on uninvested money?" -> help
+- "do you offer certificates of deposit?" -> help
+- "how would I go about changing my address on file?" -> help
 - "which stock should I buy?" -> none
 - "what's the weather like?" -> none
 - "thanks!" -> none
