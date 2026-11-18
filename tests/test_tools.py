@@ -167,7 +167,11 @@ def test_every_tool_belongs_to_a_group_and_every_group_has_a_small_menu():
     assert all(tool.groups for tool in ALL_TOOLS)
     for group in ToolGroup:
         menu = registry.restricted_to({group}).tool_names()
-        assert 1 <= len(menu) <= 7, (group, menu)
+        if group == ToolGroup.DECLINE_REQUEST:
+            # Declining offers no tools at all: our code sends a fixed reply instead
+            assert menu == []
+        else:
+            assert 1 <= len(menu) <= 7, (group, menu)
 
 
 def test_a_restricted_registry_offers_and_runs_only_its_tools():

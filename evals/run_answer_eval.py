@@ -12,7 +12,7 @@ from assistant.services.answer_guard import AnswerGuard
 from assistant.llm import ToolCall, stream_turn, tool_request_message, tool_result_message
 from assistant.services.chat_service import ChatService
 from assistant.services.agent import help_search_found_nothing
-from assistant.services.tool_router import ToolRouter, fixed_reply_for, required_calls_for
+from assistant.services.tool_router import ToolRouter, declined_reply_for, fixed_reply_for, required_calls_for
 from assistant.tools import ALL_TOOLS
 from assistant.tools.base import ToolContext
 from assistant.tools.registry import ToolRegistry
@@ -54,6 +54,10 @@ async def answer_like_the_app(question: str, search_help) -> tuple[str, list[dic
     messages = build_messages({"question": question})
     registry, groups = await ROUTER.choose_registry_and_groups(messages, REGISTRY)
     route = ",".join(sorted(g.value for g in groups)) if groups is not None else "all"
+    # The app answers a request it never helps with from code, without a lookup or the model
+    declined_reply = declined_reply_for(groups)
+    if declined_reply:
+        return declined_reply, [], route
     context = ToolContext(ledger=None, search_help=search_help)
 
     passages = []

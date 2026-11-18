@@ -66,6 +66,9 @@ class ToolGroup(StrEnum):
     HUMAN_HELP = "human"
     # General questions about how things work here, answered from the help-center articles
     HELP_CENTER = "help"
+    # Not a kind of help: the router's way of saying "we do not help with this" (advice, other people's accounts,
+    # unrelated topics). No tool belongs to it, so choosing it offers no tools; our code sends a fixed reply instead.
+    DECLINE_REQUEST = "decline"
 
 
 # One tool the model may use. "frozen" means it can't be changed after creation.

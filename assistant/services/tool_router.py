@@ -5,6 +5,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from assistant import llm
+from assistant.replies import REPLY_NOTHING_FOUND, REPLY_CANNOT_HELP_WITH_THAT
 from assistant.tools.base import ToolGroup
 from assistant.tools.registry import ToolRegistry
 
@@ -17,10 +18,6 @@ ROUTER_MESSAGE_CHARS = 300
 
 # The router's answer when no tool is needed at all
 NO_TOOLS_WORD = "none"
-
-# What the customer is told when a help-only question finds nothing in the help center. Sent by our code, because
-# the model kept adding invented next steps ("let's check your account details") to its own wording.
-NOTHING_FOUND_REPLY = "I'm sorry, I don't have that information. I can connect you with a person if you would like."
 
 
 # Reads the router's instructions the first time they are needed, then reuses them
@@ -43,6 +40,10 @@ def recent_conversation(messages: list[dict]) -> str:
 def parse_groups(answer: str) -> set[ToolGroup] | None:
     words = set(re.findall(r"[a-z]+", answer.lower()))
     groups = {group for group in ToolGroup if group.value in words}
+    # "decline" next to any other word means the router was unsure. The other word wins, so a real question
+    # is never turned away.
+    if len(groups) > 1:
+        groups.discard(ToolGroup.DECLINE_REQUEST)
     if groups:
         return groups
     if NO_TOOLS_WORD in words:
@@ -66,10 +67,16 @@ def required_calls_for(groups: set[ToolGroup] | None, messages: list[dict]) -> l
     return [llm.ToolCall(id="required-help-search", name="search_help_center", arguments=question)]
 
 
+# The reply our code sends INSTEAD of any lookup or model call, because the router said this is a request we do not
+# help with. None for every other route.
+def declined_reply_for(groups: set[ToolGroup] | None) -> str | None:
+    return REPLY_CANNOT_HELP_WITH_THAT if groups == {ToolGroup.DECLINE_REQUEST} else None
+
+
 # The reply our code sends if the required help search finds nothing, or None when the model should still answer.
 # Only a help-only route gets one: with another route as well (for example fees), the other lookup may still answer.
 def fixed_reply_for(groups: set[ToolGroup] | None) -> str | None:
-    return NOTHING_FOUND_REPLY if groups == {ToolGroup.HELP_CENTER} else None
+    return REPLY_NOTHING_FOUND if groups == {ToolGroup.HELP_CENTER} else None
 
 
 # Decides which tools the model is offered for a message. Offering 3 to 6 tools instead of all of
