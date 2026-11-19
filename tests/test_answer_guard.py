@@ -4,6 +4,8 @@ from assistant.services.answer_guard import (
     ANSWER_STOPPED_MESSAGE,
     AnswerGuard,
     checked_figures_in,
+    durations_backed_by,
+    durations_in,
     every_figure_in,
     figures_in_the_real_help_articles,
     find_unsafe_reason,
@@ -79,9 +81,11 @@ def test_one_figure_written_different_ways_compares_equal(written, expected):
     assert normalise_number(written) == expected
 
 
-def test_only_money_percentages_and_large_numbers_and_codes_are_checked():
-    assert checked_figures_in("Pay $5 or 3 business days or 2.5% or 7,500 or 12000 or QUIET-FEE-0 or e-mail.") == [
-        "5", "2.5", "7500", "12000", "QUIET-FEE-0"]
+def test_only_money_percentages_large_numbers_codes_and_durations_are_checked():
+    sentence = "Pay $5 or 3 business days or 2.5% or 7,500 or 12000 or QUIET-FEE-0 or step 4 or e-mail."
+    # "step 4" is a small plain number and is not checked; "3 business days" is a duration and is, last in the list
+    assert checked_figures_in(sentence) == ["5", "2.5", "7500", "12000", "QUIET-FEE-0", "3 day"]
+    assert checked_figures_in(sentence, with_durations=False) == ["5", "2.5", "7500", "12000", "QUIET-FEE-0"]
 
 
 def test_every_number_in_a_trusted_text_is_trusted_even_small_ones():
@@ -120,3 +124,51 @@ def test_figures_from_ledger_results_and_the_customers_words_are_backed():
 def test_one_unbacked_figure_stops_a_sentence_that_also_has_a_real_one():
     shown, _ = shown_to_customer(["The limit is $25,000 and the bonus is $9,999. "])
     assert shown == [ANSWER_STOPPED_MESSAGE]
+
+
+# Lengths of time: a number (or range) and a unit are checked as a pair
+def test_durations_are_read_in_one_written_form():
+    assert durations_in("It takes 3 business days.") == ["3 day"]
+    assert durations_in("5 to 7 working days, or 24 hours") == ["5-7 day", "24 hour"]
+    assert durations_in("1-2 weeks") == ["1-2 week"]
+
+
+def test_other_small_numbers_are_not_durations():
+    # "day 2 of 3" and "1,000 days" are not lengths of time as written
+    assert durations_in("It is day 2 of 3. Step 2.") == []
+    assert durations_in("about 1,000 days") == []
+
+
+def test_a_range_backs_each_end_of_it():
+    assert {"5-7 day", "5 day", "7 day"} <= durations_backed_by("Takes 5 to 7 business days.")
+
+
+def stopped_after(answer: str) -> str | None:
+    guard = AnswerGuard()
+    guard.release_completed_sentences(answer + " ")
+    return guard.stopped_because
+
+
+def test_an_invented_duration_is_stopped_and_the_real_ones_are_not():
+    assert stopped_after("Withdrawals usually take 3 to 5 business days.") is not None
+    assert stopped_after("Withdrawals usually take 3 business days.") is None
+    assert stopped_after("A transfer in takes 5 to 7 business days.") is None
+    assert stopped_after("It can take up to 7 days.") is None
+
+
+def test_the_customers_own_duration_is_trusted():
+    guard = AnswerGuard()
+    guard.trust_figures_in("I need it within 9 days")
+    guard.release_completed_sentences("You asked about 9 days. ")
+    assert guard.stopped_because is None
+
+
+def test_durations_are_not_checked_once_ledger_data_backs_the_answer():
+    guard = AnswerGuard()
+    guard.trust_figures_in('{"business_day": 2, "total_business_days": 3}')
+    guard.stop_checking_durations_for_this_answer()
+    guard.release_completed_sentences("About 1 business day is left. ")
+    assert guard.stopped_because is None
+    # Money and codes are still checked
+    guard.release_completed_sentences("Your fee is $45. ")
+    assert guard.stopped_because is not None
