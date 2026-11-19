@@ -21,7 +21,9 @@ from assistant.services.agent import ToolRound, ToolStarted, fixed_reply_only, r
 from assistant.services.action_service import ActionService
 from assistant.services.history import trim_to_budget
 from assistant.sse import sse
-from assistant.services.tool_router import ToolRouter, required_calls_for, fixed_reply_for, declined_reply_for
+from assistant.services.tool_router import (
+    ToolRouter, required_calls_for, fixed_reply_for, declined_reply_for, groups_after_decline_check, last_customer_message
+)
 from assistant.clients.embeddings import embed_texts_for_search
 from assistant.repositories.help_passages import HelpPassageRepository
 from assistant.services.help_center_service import HelpCenterService
@@ -124,6 +126,14 @@ class ChatService:
             # run_agent reports three kinds of event: words for the customer, "a tool is running", and a finished round of lookups
             # Offer the model only the tools this message needs (falls back to all of them)
             registry, groups = await self.router.choose_registry_and_groups(messages, self.registry)
+            # The router may have wrongly declined a real question: if the help center can answer it, treat it as a help question
+            checked_groups = await groups_after_decline_check(
+                groups, last_customer_message(messages), self._help_search_function_for_tools([])
+            )
+            if checked_groups != groups:
+                groups = checked_groups
+                registry = self.registry.restricted_to(groups)
+
             # A request we never help with gets the fixed reply: no lookup and no model call
             declined_reply = declined_reply_for(groups)
             events = fixed_reply_only(declined_reply) if declined_reply else run_agent(

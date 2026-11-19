@@ -12,7 +12,9 @@ from assistant.services.answer_guard import AnswerGuard
 from assistant.llm import ToolCall, stream_turn, tool_request_message, tool_result_message
 from assistant.services.chat_service import ChatService
 from assistant.services.agent import help_search_found_nothing
-from assistant.services.tool_router import ToolRouter, declined_reply_for, fixed_reply_for, required_calls_for
+from assistant.services.tool_router import (
+    ToolRouter, declined_reply_for, fixed_reply_for, groups_after_decline_check, last_customer_message, required_calls_for,
+)
 from assistant.tools import ALL_TOOLS
 from assistant.tools.base import ToolContext
 from assistant.tools.registry import ToolRegistry
@@ -53,6 +55,11 @@ def numbers_in(text: str) -> set[str]:
 async def answer_like_the_app(question: str, search_help) -> tuple[str, list[dict], str]:
     messages = build_messages({"question": question})
     registry, groups = await ROUTER.choose_registry_and_groups(messages, REGISTRY)
+    # As in the app: a decline the help center can answer is treated as a help question
+    checked_groups = await groups_after_decline_check(groups, last_customer_message(messages), search_help)
+    if checked_groups != groups:
+        groups = checked_groups
+        registry = REGISTRY.restricted_to(groups)
     route = ",".join(sorted(g.value for g in groups)) if groups is not None else "all"
     # The app answers a request it never helps with from code, without a lookup or the model
     declined_reply = declined_reply_for(groups)
