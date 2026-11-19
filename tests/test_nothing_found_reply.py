@@ -2,7 +2,8 @@ import asyncio
 import json
 
 from assistant.services.agent import Token, help_search_found_nothing, run_agent
-from assistant.services.tool_router import NOTHING_FOUND_REPLY, fixed_reply_for, required_calls_for
+from assistant.replies import REPLY_NOTHING_FOUND
+from assistant.services.tool_router import fixed_reply_for, required_calls_for
 from assistant.tools import ALL_TOOLS
 from assistant.tools.base import ToolContext, ToolGroup
 from assistant.tools.registry import ToolRegistry
@@ -17,7 +18,7 @@ def search_result(found: bool) -> str:
 
 
 def test_a_help_only_route_gets_the_fixed_reply():
-    assert fixed_reply_for({ToolGroup.HELP_CENTER}) == NOTHING_FOUND_REPLY
+    assert fixed_reply_for({ToolGroup.HELP_CENTER}) == REPLY_NOTHING_FOUND
 
 
 def test_any_other_route_keeps_the_model_in_charge():
@@ -60,7 +61,7 @@ def run_help_question(passages: list[dict], groups, monkeypatch) -> tuple[str, i
 
 def test_a_help_question_with_nothing_found_gets_the_fixed_reply_and_the_model_is_not_asked(monkeypatch):
     shown, times_model_asked = run_help_question([], {ToolGroup.HELP_CENTER}, monkeypatch)
-    assert shown == NOTHING_FOUND_REPLY
+    assert shown == REPLY_NOTHING_FOUND
     assert times_model_asked == 0
 
 

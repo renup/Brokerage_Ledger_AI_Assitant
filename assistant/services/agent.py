@@ -134,3 +134,9 @@ async def run_agent(
         if round_number == 0 and required_calls and reply_when_help_finds_nothing and help_search_found_nothing(results):
             yield Token(reply_when_help_finds_nothing)
             return
+
+
+# Gives a reply our code chose before any lookup or model call, in the same kind of event run_agent gives,
+# so the caller handles it exactly like a model answer (guard, saving, streaming).
+async def fixed_reply_only(reply: str) -> AsyncIterator[Token]:
+    yield Token(reply)

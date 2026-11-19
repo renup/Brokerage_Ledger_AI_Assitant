@@ -17,10 +17,14 @@ from assistant.repositories.messages import MessageRepository
 from assistant.repositories.actions import ActionRepository
 from assistant.repositories.audit import AuditRepository
 from assistant.schemas import ProposalOut
+from assistant.services.agent import ToolRound, ToolStarted, fixed_reply_only, run_agent
 from assistant.services.action_service import ActionService
 from assistant.services.history import trim_to_budget
 from assistant.sse import sse
-from assistant.services.tool_router import ToolRouter, required_calls_for, fixed_reply_for
+from assistant.services.tool_router import (
+    ToolRouter, declined_reply_for, fixed_reply_for, groups_after_decline_check, groups_with_help_articles,
+    last_customer_message, required_calls_for,
+)
 from assistant.clients.embeddings import embed_texts_for_search
 from assistant.repositories.help_passages import HelpPassageRepository
 from assistant.services.help_center_service import HelpCenterService
@@ -123,7 +127,26 @@ class ChatService:
             # run_agent reports three kinds of event: words for the customer, "a tool is running", and a finished round of lookups
             # Offer the model only the tools this message needs (falls back to all of them)
             registry, groups = await self.router.choose_registry_and_groups(messages, self.registry)
-            async for event in run_agent(messages, registry, context, required_calls_for(groups, messages), fixed_reply_for(groups)):
+            # The router may have wrongly declined a real question: if the help center can answer it, treat it as a help question
+            checked_groups = await groups_after_decline_check(
+                groups, last_customer_message(messages), self._help_search_function_for_tools([])
+            )
+            if checked_groups != groups:
+                groups = checked_groups
+                registry = self.registry.restricted_to(groups)
+
+            # Reference questions (fees, tax forms) also depend on what the help articles say: search them as well
+            groups_with_articles = groups_with_help_articles(groups)
+            if groups_with_articles != groups:
+                groups = groups_with_articles
+                registry = self.registry.restricted_to(groups)
+
+            # A request we never help with gets the fixed reply: no lookup and no model call
+            declined_reply = declined_reply_for(groups)
+            events = fixed_reply_only(declined_reply) if declined_reply else run_agent(
+                messages, registry, context, required_calls_for(groups, messages), fixed_reply_for(groups)
+            )
+            async for event in events:
                 if isinstance(event, ToolStarted):
                     # Lets the app show "Checking your account…" while the tool works
                     yield sse("tool", {"name": event.name})
@@ -135,6 +158,7 @@ class ChatService:
                     for record in event.records:
                         if record.name != "search_help_center":
                             guard.trust_figures_in(record.result)
+                            guard.stop_checking_durations_for_this_answer()
                     for announcement in self._announcements_after_round(pending):
                         yield announcement
                 else:

@@ -11,6 +11,7 @@ from assistant.auth import get_current_user
 from assistant.database import engine
 from assistant.dependencies import get_ledger_client
 from assistant.main import app as assistant_app
+from assistant.services.chat_service import ChatService
 from assistant.services.tool_router import ToolRouter, parse_groups, recent_conversation, required_calls_for
 from assistant.tools import ALL_TOOLS
 from assistant.tools.base import ToolGroup
@@ -109,7 +110,11 @@ def test_the_chat_offers_the_main_model_only_the_routed_tools(monkeypatch):
             offered.append([t["function"]["name"] for t in tools or []])
             yield "Done."
 
+    async def finds_nothing(question):
+        return []
+
     monkeypatch.setattr(llm, "stream_turn", routed_model)
+    monkeypatch.setattr(ChatService, "_help_search_function_for_tools", lambda self, article_names: finds_nothing)
     assistant_app.dependency_overrides[get_current_user] = lambda: MAYA
     assistant_app.dependency_overrides[get_ledger_client] = lambda: FakeLedger()
     try:
@@ -118,7 +123,8 @@ def test_the_chat_offers_the_main_model_only_the_routed_tools(monkeypatch):
         assistant_app.dependency_overrides.clear()
     assert events[-1][0] == "done"
     assert len(offered) == 1
-    assert set(offered[0]) == {"get_fees", "get_tax_documents", "lookup_error_code", "estimate_arrival"}
+    # The reference tools, plus the help search: reference questions also depend on what the help articles say
+    assert set(offered[0]) == {"get_fees", "get_tax_documents", "lookup_error_code", "estimate_arrival", "search_help_center"}
 
 
 def test_a_help_route_requires_the_help_search_with_the_customers_last_message():
