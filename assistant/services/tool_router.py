@@ -27,6 +27,11 @@ DECLINE_CHECK_SECONDS = 3
 # The router answers that mean "we do not help with this". No tool belongs to them.
 DECLINE_GROUPS = {ToolGroup.DECLINE_REQUEST, ToolGroup.THIRD_PARTY_REQUEST}
 
+# Routes whose questions also depend on what the help articles say. Tax-form and fee questions go to "reference"
+# (tools), but the facts around them (when forms are ready, what "pending" means) live in the articles. With no
+# search the model answers those from memory and sometimes invents them.
+ROUTES_THAT_ALSO_NEED_THE_HELP_ARTICLES = {ToolGroup.REFERENCE}
+
 
 # Reads the router's instructions the first time they are needed, then reuses them
 @lru_cache
@@ -102,6 +107,14 @@ async def groups_after_decline_check(groups: set[ToolGroup] | None, question: st
         # Too slow or broken: the decline stands (refusing is the safe side for advice and other people's accounts)
         return groups
     return {ToolGroup.HELP_CENTER} if passages else groups
+
+
+# Adds the help center to a route that needs the articles as well as its tools, so the required help search runs
+# for it. Any other route is returned unchanged.
+def groups_with_help_articles(groups: set[ToolGroup] | None) -> set[ToolGroup] | None:
+    if groups and groups & ROUTES_THAT_ALSO_NEED_THE_HELP_ARTICLES:
+        return groups | {ToolGroup.HELP_CENTER}
+    return groups
 
 
 # The reply our code sends if the required help search finds nothing, or None when the model should still answer.

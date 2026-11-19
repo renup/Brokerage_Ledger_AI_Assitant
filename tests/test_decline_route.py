@@ -9,7 +9,9 @@ from assistant.main import app as assistant_app
 from assistant.replies import REPLY_CANNOT_HELP_WITH_THAT, REPLY_ONLY_THEIR_OWN_ACCOUNT
 from assistant.services import tool_router
 from assistant.services.chat_service import ChatService
-from assistant.services.tool_router import declined_reply_for, groups_after_decline_check, parse_groups
+from assistant.services.tool_router import (
+    declined_reply_for, fixed_reply_for, groups_after_decline_check, groups_with_help_articles, parse_groups, required_calls_for,
+)
 from assistant.tools.base import ToolGroup
 from tests.test_action_service import FakeLedger
 from tests.test_assistant import MAYA, parse_sse
@@ -203,3 +205,24 @@ def test_a_request_about_someone_else_gets_the_fixed_reply_and_the_model_is_neve
 
     assert asked == []
     assert "".join(data["text"] for name, data in events if name == "token") == REPLY_ONLY_THEIR_OWN_ACCOUNT
+
+
+# Reference questions (fees, tax forms) also search the help articles, so facts such as "when are 5498 forms ready"
+# come from them and not from the model's memory
+def test_a_reference_route_also_gets_the_help_center():
+    assert groups_with_help_articles({ToolGroup.REFERENCE}) == {ToolGroup.REFERENCE, ToolGroup.HELP_CENTER}
+    assert groups_with_help_articles({ToolGroup.ACCOUNT_DATA, ToolGroup.REFERENCE}) == {
+        ToolGroup.ACCOUNT_DATA, ToolGroup.REFERENCE, ToolGroup.HELP_CENTER}
+
+
+def test_other_routes_are_left_alone_by_the_help_articles_step():
+    for groups in [{ToolGroup.ACCOUNT_DATA}, {ToolGroup.HELP_CENTER}, {ToolGroup.CHANGES}, {ToolGroup.DECLINE_REQUEST}, set(), None]:
+        assert groups_with_help_articles(groups) == groups
+
+
+# With the help center added, the search runs in code before the model speaks, and the fixed "I don't have that
+# information" reply still does NOT fire: the fees tool may answer even when no article does
+def test_a_reference_question_searches_the_articles_but_never_gets_the_nothing_found_reply():
+    groups = groups_with_help_articles({ToolGroup.REFERENCE})
+    assert [call.name for call in required_calls_for(groups, [{"role": "user", "content": "When are 5498 forms ready?"}])] == ["search_help_center"]
+    assert fixed_reply_for(groups) is None

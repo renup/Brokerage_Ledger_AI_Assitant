@@ -22,7 +22,8 @@ from assistant.services.action_service import ActionService
 from assistant.services.history import trim_to_budget
 from assistant.sse import sse
 from assistant.services.tool_router import (
-    ToolRouter, required_calls_for, fixed_reply_for, declined_reply_for, groups_after_decline_check, last_customer_message
+    ToolRouter, declined_reply_for, fixed_reply_for, groups_after_decline_check, groups_with_help_articles,
+    last_customer_message, required_calls_for,
 )
 from assistant.clients.embeddings import embed_texts_for_search
 from assistant.repositories.help_passages import HelpPassageRepository
@@ -132,6 +133,12 @@ class ChatService:
             )
             if checked_groups != groups:
                 groups = checked_groups
+                registry = self.registry.restricted_to(groups)
+
+            # Reference questions (fees, tax forms) also depend on what the help articles say: search them as well
+            groups_with_articles = groups_with_help_articles(groups)
+            if groups_with_articles != groups:
+                groups = groups_with_articles
                 registry = self.registry.restricted_to(groups)
 
             # A request we never help with gets the fixed reply: no lookup and no model call
