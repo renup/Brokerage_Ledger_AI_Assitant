@@ -54,9 +54,14 @@ class HelpCenterService:
         self.passages = passages
         self.embed = embed
 
+    # Where each stored passage came from, as (file, heading)
+    def stored_locations(self) -> set[tuple[str, str]]:
+        return set(self.passages.stored_passages_by_location())
+
     # Brings the stored passages in line with the articles: new ones are added, changed ones re-embedded,
     # removed sections deleted, and unchanged ones left alone (embedding is the slow part).
-    async def index_help_center_articles(self, articles: list[Passage]) -> IndexReport:
+    # keep_stored: locations screening stopped; their stored version stays live even though they are not in `articles`.
+    async def index_help_center_articles(self, articles: list[Passage], keep_stored: frozenset[tuple[str, str]] = frozenset()) -> IndexReport:
         stored = self.passages.stored_passages_by_location()
         current = {(passage.source, passage.heading): passage for passage in articles}
 
@@ -88,9 +93,10 @@ class HelpCenterService:
                 row.article, row.text, row.text_hash, row.embedding = passage.article, passage.text, fingerprint, vector
                 updated += 1
 
+        # A passage that screening stopped is left exactly as stored: neither updated nor deleted
         removed = 0
         for location, row in stored.items():
-            if location not in current:
+            if location not in current and location not in keep_stored:
                 self.passages.remove(row)
                 removed += 1
 
