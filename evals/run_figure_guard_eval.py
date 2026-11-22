@@ -16,7 +16,7 @@ def guard_answer_like_the_app(case: dict) -> str | None:
     for ledger_result in case["ledger_results"]:
         guard.trust_figures_in(ledger_result)
         # As in the app: an answer resting on ledger data may work out a length of time
-        guard.stop_checking_durations_for_this_answer()
+        guard.stop_checking_turnarounds_for_this_answer()
     guard.release_completed_sentences(case["answer"])
     guard.release_unfinished_sentence()
     return guard.stopped_because
