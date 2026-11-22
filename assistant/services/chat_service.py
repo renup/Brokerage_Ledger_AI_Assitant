@@ -158,7 +158,7 @@ class ChatService:
                     for record in event.records:
                         if record.name != "search_help_center":
                             guard.trust_figures_in(record.result)
-                            guard.stop_checking_durations_for_this_answer()
+                            guard.stop_checking_turnarounds_for_this_answer()
                     for announcement in self._announcements_after_round(pending):
                         yield announcement
                 else:

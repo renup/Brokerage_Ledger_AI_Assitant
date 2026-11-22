@@ -1,13 +1,17 @@
+import re
+
 import pytest
 
+from assistant.knowledge.passages import load_help_center_passages
 from assistant.services.answer_guard import (
     ANSWER_STOPPED_MESSAGE,
     AnswerGuard,
     checked_figures_in,
-    durations_backed_by,
-    durations_in,
+    turnarounds_backed_by,
+    turnarounds_in,
     every_figure_in,
     figures_in_the_real_help_articles,
+    find_tax_liability_claim,
     find_unsafe_reason,
     normalise_number,
 )
@@ -81,11 +85,11 @@ def test_one_figure_written_different_ways_compares_equal(written, expected):
     assert normalise_number(written) == expected
 
 
-def test_only_money_percentages_large_numbers_codes_and_durations_are_checked():
+def test_only_money_percentages_large_numbers_codes_and_turnaround_times_are_checked():
     sentence = "Pay $5 or 3 business days or 2.5% or 7,500 or 12000 or QUIET-FEE-0 or step 4 or e-mail."
-    # "step 4" is a small plain number and is not checked; "3 business days" is a duration and is, last in the list
+    # "step 4" is a small plain number and is not checked; "3 business days" is a turnaround time and is, last in the list
     assert checked_figures_in(sentence) == ["5", "2.5", "7500", "12000", "QUIET-FEE-0", "3 day"]
-    assert checked_figures_in(sentence, with_durations=False) == ["5", "2.5", "7500", "12000", "QUIET-FEE-0"]
+    assert checked_figures_in(sentence, with_turnarounds=False) == ["5", "2.5", "7500", "12000", "QUIET-FEE-0"]
 
 
 def test_every_number_in_a_trusted_text_is_trusted_even_small_ones():
@@ -127,20 +131,20 @@ def test_one_unbacked_figure_stops_a_sentence_that_also_has_a_real_one():
 
 
 # Lengths of time: a number (or range) and a unit are checked as a pair
-def test_durations_are_read_in_one_written_form():
-    assert durations_in("It takes 3 business days.") == ["3 day"]
-    assert durations_in("5 to 7 working days, or 24 hours") == ["5-7 day", "24 hour"]
-    assert durations_in("1-2 weeks") == ["1-2 week"]
+def test_turnaround_times_are_read_in_one_written_form():
+    assert turnarounds_in("It takes 3 business days.") == ["3 day"]
+    assert turnarounds_in("5 to 7 working days, or 24 hours") == ["5-7 day", "24 hour"]
+    assert turnarounds_in("1-2 weeks") == ["1-2 week"]
 
 
-def test_other_small_numbers_are_not_durations():
+def test_other_small_numbers_are_not_turnaround_times():
     # "day 2 of 3" and "1,000 days" are not lengths of time as written
-    assert durations_in("It is day 2 of 3. Step 2.") == []
-    assert durations_in("about 1,000 days") == []
+    assert turnarounds_in("It is day 2 of 3. Step 2.") == []
+    assert turnarounds_in("about 1,000 days") == []
 
 
 def test_a_range_backs_each_end_of_it():
-    assert {"5-7 day", "5 day", "7 day"} <= durations_backed_by("Takes 5 to 7 business days.")
+    assert {"5-7 day", "5 day", "7 day"} <= turnarounds_backed_by("Takes 5 to 7 business days.")
 
 
 def stopped_after(answer: str) -> str | None:
@@ -149,26 +153,60 @@ def stopped_after(answer: str) -> str | None:
     return guard.stopped_because
 
 
-def test_an_invented_duration_is_stopped_and_the_real_ones_are_not():
+def test_an_invented_turnaround_time_is_stopped_and_the_real_ones_are_not():
     assert stopped_after("Withdrawals usually take 3 to 5 business days.") is not None
     assert stopped_after("Withdrawals usually take 3 business days.") is None
     assert stopped_after("A transfer in takes 5 to 7 business days.") is None
     assert stopped_after("It can take up to 7 days.") is None
 
 
-def test_the_customers_own_duration_is_trusted():
+def test_the_customers_own_turnaround_time_is_trusted():
     guard = AnswerGuard()
     guard.trust_figures_in("I need it within 9 days")
     guard.release_completed_sentences("You asked about 9 days. ")
     assert guard.stopped_because is None
 
 
-def test_durations_are_not_checked_once_ledger_data_backs_the_answer():
+def test_turnaround_times_are_not_checked_once_ledger_data_backs_the_answer():
     guard = AnswerGuard()
     guard.trust_figures_in('{"business_day": 2, "total_business_days": 3}')
-    guard.stop_checking_durations_for_this_answer()
+    guard.stop_checking_turnarounds_for_this_answer()
     guard.release_completed_sentences("About 1 business day is left. ")
     assert guard.stopped_because is None
     # Money and codes are still checked
     guard.release_completed_sentences("Your fee is $45. ")
     assert guard.stopped_because is not None
+
+
+# --- tax claims: the assistant may not say what a customer owes or must report ---
+
+@pytest.mark.parametrize("sentence", [
+    "You do not owe any tax on withdrawals from your account. ",
+    "You owe tax on this gain. ",
+    "There is nothing to report on your return. ",
+    "You must report this withdrawal as income. ",
+    "You don't need to report it. ",
+])
+def test_a_sentence_saying_what_the_customer_owes_or_reports_is_stopped(sentence):
+    assert find_tax_liability_claim(sentence) is not None
+    assert stopped_after(sentence.strip()) is not None
+
+
+@pytest.mark.parametrize("sentence", [
+    "A Roth IRA is funded with money that has already been taxed. ",
+    "Ask a tax professional whether you owe tax on this. ",
+    "I can't say what you owe, so please talk to a tax adviser. ",
+    "Tax forms for the year are in your documents. ",
+    "If you owe anything, a tax professional can tell you. ",
+    # General facts about an account type are not a claim about this customer's own tax duty
+    "Roth withdrawals are generally tax-free. ",
+    "A traditional IRA is usually taxable when you withdraw. ",
+])
+def test_neutral_or_hedged_tax_sentences_pass(sentence):
+    assert find_tax_liability_claim(sentence) is None
+
+
+def test_no_sentence_in_the_real_help_articles_is_a_tax_claim():
+    for real in load_help_center_passages():
+        for sentence in re.split(r"(?<=[.!?])\s+", f"{real.heading}. {real.text}"):
+            assert find_tax_liability_claim(sentence) is None, (real.source, sentence)
