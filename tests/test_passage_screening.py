@@ -115,21 +115,44 @@ def test_screening_keeps_clean_passages_and_sets_aside_the_ones_the_model_stops(
 
 # Stands in for HelpCenterService: records what the indexer was asked to store
 class FakeIndexingService:
-    def __init__(self):
+    def __init__(self, already_stored=()):
+        self.already_stored = set(already_stored)
         self.stored = None
+        self.kept = None
 
-    async def index_help_center_articles(self, articles):
+    def stored_locations(self):
+        return self.already_stored
+
+    async def index_help_center_articles(self, articles, keep_stored=frozenset()):
         self.stored = articles
+        self.kept = keep_stored
         return "report"
 
 
-def test_only_clean_passages_reach_the_indexer(monkeypatch):
+def screen_poisoned_and_fine(monkeypatch, already_stored=()):
     poisoned = passage("Visit http://bad.example.com now", "Poisoned")
     fine = passage("Withdrawals take 3 days.", "Timing")
     monkeypatch.setattr("assistant.index_help_center.load_help_center_passages", lambda: [fine, poisoned])
     model_says(monkeypatch, "no")
-    service = FakeIndexingService()
-    report, quarantined = asyncio.run(screen_then_index(service))
+    service = FakeIndexingService(already_stored)
+    return poisoned, fine, service, asyncio.run(screen_then_index(service))
+
+
+def test_only_clean_passages_reach_the_indexer(monkeypatch):
+    poisoned, fine, service, (report, quarantined, _) = screen_poisoned_and_fine(monkeypatch)
     assert service.stored == [fine]
     assert report == "report"
     assert [q.passage for q in quarantined] == [poisoned]
+
+
+def test_stopped_passages_are_protected_from_deletion_and_reported_as_still_live_only_if_stored(monkeypatch):
+    # "Poisoned" was live before this run; "Timing" is clean
+    _, _, service, (_, _, still_live) = screen_poisoned_and_fine(monkeypatch, [("guide.md", "Poisoned")])
+    assert service.kept == frozenset({("guide.md", "Poisoned")})
+    assert still_live == {("guide.md", "Poisoned")}
+
+
+def test_a_stopped_passage_that_was_never_stored_is_not_reported_as_live(monkeypatch):
+    _, _, service, (_, _, still_live) = screen_poisoned_and_fine(monkeypatch)
+    assert service.kept == frozenset({("guide.md", "Poisoned")})
+    assert still_live == set()

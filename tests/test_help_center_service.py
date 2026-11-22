@@ -91,6 +91,37 @@ def test_only_the_edited_passage_is_embedded_again_and_removed_sections_are_dele
     assert stored[("a.md", "Fees")].text == "what fees cost, now different"
 
 
+def test_a_kept_passage_is_not_deleted_or_changed_even_though_it_is_not_in_the_list(db):
+    service = make_service(db, FakeEmbedder())
+    asyncio.run(service.index_help_center_articles(ARTICLES))
+    # "Taxes" was stopped by screening, so it is missing from the list but named in keep_stored
+    report = asyncio.run(service.index_help_center_articles(
+        [ARTICLES[0], ARTICLES[2]], keep_stored=frozenset({("a.md", "Taxes")})
+    ))
+    assert (report.added, report.updated, report.unchanged, report.removed) == (0, 0, 2, 0)
+    stored = HelpPassageRepository(db).stored_passages_by_location()
+    assert set(stored) == {("a.md", "Fees"), ("a.md", "Taxes"), ("a.md", "Moving")}
+    assert stored[("a.md", "Taxes")].text == "tax forms"
+
+
+def test_a_passage_not_named_in_keep_stored_is_still_deleted(db):
+    service = make_service(db, FakeEmbedder())
+    asyncio.run(service.index_help_center_articles(ARTICLES))
+    report = asyncio.run(service.index_help_center_articles(
+        [ARTICLES[0]], keep_stored=frozenset({("a.md", "Taxes")})
+    ))
+    # "Moving" was removed from the article on purpose; only "Taxes" is protected
+    assert report.removed == 1
+    assert set(HelpPassageRepository(db).stored_passages_by_location()) == {("a.md", "Fees"), ("a.md", "Taxes")}
+
+
+def test_stored_locations_lists_where_each_stored_passage_came_from(db):
+    service = make_service(db, FakeEmbedder())
+    assert service.stored_locations() == set()
+    asyncio.run(service.index_help_center_articles(ARTICLES))
+    assert service.stored_locations() == {("a.md", "Fees"), ("a.md", "Taxes"), ("a.md", "Moving")}
+
+
 def test_a_failed_embedding_leaves_the_table_untouched(db):
     async def broken(texts):
         raise RuntimeError("model down")
