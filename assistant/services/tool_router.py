@@ -32,6 +32,22 @@ DECLINE_GROUPS = {ToolGroup.DECLINE_REQUEST, ToolGroup.THIRD_PARTY_REQUEST}
 # search the model answers those from memory and sometimes invents them.
 ROUTES_THAT_ALSO_NEED_THE_HELP_ARTICLES = {ToolGroup.REFERENCE}
 
+# Words that put a question about tax. "government" is included because customers ask "what do I pay the government".
+TAX_WORDS = re.compile(r"\b(?:tax|taxes|taxed|taxable|irs|government)\b", re.IGNORECASE)
+
+# Words that turn a tax question into a request for advice: what the customer owes, can deduct, or can save.
+# A tax question without one of these ("when will my tax documents be ready?", "what is tax-advantaged?") is not advice.
+OWING_OR_SAVING_WORDS = re.compile(
+    r"\b(?:owe|owed|pay|paying|liable|liability|deduct\w*|write[- ]?offs?|lower|reduce|avoid|save)\b", re.IGNORECASE
+)
+
+# Advice questions that never say "tax": "am I liable for the gain", "can I write this loss off"
+LIABLE_FOR_A_GAIN = re.compile(r"\b(?:liable|liability)\b.*\b(?:gains?|loss(?:es)?|income|earnings|dividends)\b", re.IGNORECASE)
+WRITING_OFF_A_LOSS = re.compile(r"\bwrite\b.{0,25}\boff\b", re.IGNORECASE)
+# "Can I deduct my IRA contribution?" has no tax word. Only the customer asking for permission counts: "the fee is deducted
+# from my balance" is not a tax question.
+ASKING_TO_DEDUCT = re.compile(r"\b(?:can|could|may|should)\s+i\s+deduct\b", re.IGNORECASE)
+
 
 # Reads the router's instructions the first time they are needed, then reuses them
 @lru_cache
@@ -92,6 +108,27 @@ def declined_reply_for(groups: set[ToolGroup] | None) -> str | None:
     if not groups or not groups <= DECLINE_GROUPS:
         return None
     return REPLY_ONLY_THEIR_OWN_ACCOUNT if ToolGroup.THIRD_PARTY_REQUEST in groups else REPLY_CANNOT_HELP_WITH_THAT
+
+
+# True when the customer asks what they owe, can deduct or can save in tax. Wording rules only, so a new way of asking can
+# slip past; the answer guard (find_tax_liability_claim) is the net behind it.
+def question_asks_for_tax_advice(question: str) -> bool:
+    return bool(
+        (TAX_WORDS.search(question) and OWING_OR_SAVING_WORDS.search(question))
+        or LIABLE_FOR_A_GAIN.search(question)
+        or WRITING_OFF_A_LOSS.search(question)
+        or ASKING_TO_DEDUCT.search(question)
+    )
+
+
+# The router often sends tax-advice questions to the tax-form lookup because the word "tax" is in them. When the
+# question asks for tax advice, the route becomes "decline". A change request or another person's account keeps its own
+# route, so a message that also asks for something real is not turned away as a whole. Run this AFTER the help check:
+# a question the wording rules call tax advice is never rescued as help (a help passage on 1099 forms must not answer "do I owe tax").
+def groups_after_tax_advice_check(groups: set[ToolGroup] | None, question: str) -> set[ToolGroup] | None:
+    if groups is None or groups & {ToolGroup.CHANGES, ToolGroup.THIRD_PARTY_REQUEST} or groups == {ToolGroup.DECLINE_REQUEST}:
+        return groups
+    return {ToolGroup.DECLINE_REQUEST} if question_asks_for_tax_advice(question) else groups
 
 
 # The router can be wrong when it says "decline". Before a customer is turned away, ask the help center: if it has

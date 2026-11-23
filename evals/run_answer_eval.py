@@ -13,8 +13,8 @@ from assistant.llm import ToolCall, stream_turn, tool_request_message, tool_resu
 from assistant.services.chat_service import ChatService
 from assistant.services.agent import help_search_found_nothing
 from assistant.services.tool_router import (
-    ToolRouter, declined_reply_for, fixed_reply_for, groups_after_decline_check, groups_with_help_articles,
-    last_customer_message, required_calls_for,
+    ToolRouter, declined_reply_for, fixed_reply_for, groups_after_decline_check, groups_after_tax_advice_check,
+    groups_with_help_articles, last_customer_message, required_calls_for,
 )
 from assistant.tools import ALL_TOOLS
 from assistant.tools.base import ToolContext
@@ -60,6 +60,11 @@ async def answer_like_the_app(question: str, search_help) -> tuple[str, list[dic
     checked_groups = await groups_after_decline_check(groups, last_customer_message(messages), search_help)
     if checked_groups != groups:
         groups = checked_groups
+        registry = REGISTRY.restricted_to(groups)
+    # As in the app: a tax-advice question the router sent to a lookup becomes a decline, after the help check (never rescued)
+    tax_checked_groups = groups_after_tax_advice_check(groups, last_customer_message(messages))
+    if tax_checked_groups != groups:
+        groups = tax_checked_groups
         registry = REGISTRY.restricted_to(groups)
     # As in the app: reference questions (fees, tax forms) also search the help articles
     groups_with_articles = groups_with_help_articles(groups)
