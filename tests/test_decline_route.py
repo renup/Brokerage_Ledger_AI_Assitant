@@ -1,5 +1,6 @@
 import asyncio
 
+import pytest
 from fastapi.testclient import TestClient
 
 from assistant import llm
@@ -10,7 +11,8 @@ from assistant.replies import REPLY_CANNOT_HELP_WITH_THAT, REPLY_ONLY_THEIR_OWN_
 from assistant.services import tool_router
 from assistant.services.chat_service import ChatService
 from assistant.services.tool_router import (
-    declined_reply_for, fixed_reply_for, groups_after_decline_check, groups_with_help_articles, parse_groups, required_calls_for,
+    declined_reply_for, fixed_reply_for, groups_after_decline_check, groups_after_tax_advice_check, groups_with_help_articles,
+    parse_groups, question_asks_for_tax_advice, required_calls_for,
 )
 from assistant.tools.base import ToolGroup
 from tests.test_action_service import FakeLedger
@@ -226,3 +228,52 @@ def test_a_reference_question_searches_the_articles_but_never_gets_the_nothing_f
     groups = groups_with_help_articles({ToolGroup.REFERENCE})
     assert [call.name for call in required_calls_for(groups, [{"role": "user", "content": "When are 5498 forms ready?"}])] == ["search_help_center"]
     assert fixed_reply_for(groups) is None
+
+
+# --- tax advice: a question about what the customer owes or can deduct becomes a decline ---
+
+@pytest.mark.parametrize("question", [
+    "do I owe tax on my dividends?",
+    "How much tax do I need to pay this year on my earnings?",
+    "do i hav to pay taxes if i sell",
+    "How can I lower my tax bill this year?",
+    "Can I deduct my IRA contribution?",
+    "what do I pay the government on my earnings in CA?",
+    "Am I liable for the gain if I sell my shares next month?",
+    "Can I write this loss off against my salary?",
+])
+def test_a_question_about_what_the_customer_owes_or_can_deduct_is_tax_advice(question):
+    assert question_asks_for_tax_advice(question)
+
+
+@pytest.mark.parametrize("question", [
+    "Where is my 1099-B for this year?",
+    "Where can I download the year end forms?",
+    "When will my tax documents be ready?",
+    "What is a 1099-B?",
+    "What does tax-advantaged mean for an IRA?",
+    "Does the firm report my sales to the IRS?",
+    "What is the withdrawal fee?",
+])
+def test_tax_forms_and_definitions_are_not_tax_advice(question):
+    assert not question_asks_for_tax_advice(question)
+
+
+def test_a_tax_advice_question_on_a_lookup_route_becomes_a_decline():
+    assert groups_after_tax_advice_check({ToolGroup.REFERENCE}, "do I owe tax on my dividends?") == {ToolGroup.DECLINE_REQUEST}
+    assert groups_after_tax_advice_check({ToolGroup.HELP_CENTER}, "can I deduct my IRA contribution?") == {ToolGroup.DECLINE_REQUEST}
+
+
+def test_other_questions_and_routes_keep_the_routers_choice():
+    assert groups_after_tax_advice_check({ToolGroup.REFERENCE}, "Where is my 1099-B?") == {ToolGroup.REFERENCE}
+    # No answer from the router at all: the app falls back to every tool, which this check does not change
+    assert groups_after_tax_advice_check(None, "do I owe tax?") is None
+    # The router said "none" (small talk) but the question asks for tax advice: it is declined
+    assert groups_after_tax_advice_check(set(), "do I owe tax?") == {ToolGroup.DECLINE_REQUEST}
+    assert groups_after_tax_advice_check(set(), "thanks!") == set()
+
+
+def test_a_change_request_or_third_party_request_is_never_turned_into_a_decline():
+    question = "Cancel my withdrawal, and do I owe tax on it?"
+    assert groups_after_tax_advice_check({ToolGroup.CHANGES}, question) == {ToolGroup.CHANGES}
+    assert groups_after_tax_advice_check({ToolGroup.THIRD_PARTY_REQUEST}, question) == {ToolGroup.THIRD_PARTY_REQUEST}
