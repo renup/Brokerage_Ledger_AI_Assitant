@@ -22,8 +22,7 @@ from assistant.services.action_service import ActionService
 from assistant.services.history import trim_to_budget
 from assistant.sse import sse
 from assistant.services.tool_router import (
-    ToolRouter, declined_reply_for, fixed_reply_for, groups_after_decline_check, groups_with_help_articles,
-    last_customer_message, required_calls_for, groups_after_tax_advice_check,
+    ToolRouter, declined_reply_for, fixed_reply_for, required_calls_for, route_customer_message,
 )
 from assistant.clients.embeddings import embed_texts_for_search
 from assistant.repositories.help_passages import HelpPassageRepository
@@ -124,34 +123,17 @@ class ChatService:
         # Each round of lookups the agent reports. Saved with the reply so later turns know the real ids.
         rounds = []
         try:
-            # run_agent reports three kinds of event: words for the customer, "a tool is running", and a finished round of lookups
-            # Offer the model only the tools this message needs (falls back to all of them)
-            registry, groups = await self.router.choose_registry_and_groups(messages, self.registry)
-            # The router may have wrongly declined a real question: if the help center can answer it, treat it as a help question
-            checked_groups = await groups_after_decline_check(
-                groups, last_customer_message(messages), self._help_search_function_for_tools([])
+            # Offer the model only the tools this message needs (falls back to all of them), after the code rules adjust the route
+            registry, groups = await route_customer_message(
+                self.router, messages, self.registry, self._help_search_function_for_tools([])
             )
-            if checked_groups != groups:
-                groups = checked_groups
-                registry = self.registry.restricted_to(groups)
-
-            # A tax-advice question the router sent to the tax-form lookup becomes a decline (after the help check on purpose: a tax-advice question is never rescued as help)
-            tax_checked_groups = groups_after_tax_advice_check(groups, last_customer_message(messages))
-            if tax_checked_groups != groups:
-                groups = tax_checked_groups
-                registry = self.registry.restricted_to(groups)
-
-            # Reference questions (fees, tax forms) also depend on what the help articles say: search them as well
-            groups_with_articles = groups_with_help_articles(groups)
-            if groups_with_articles != groups:
-                groups = groups_with_articles
-                registry = self.registry.restricted_to(groups)
 
             # A request we never help with gets the fixed reply: no lookup and no model call
             declined_reply = declined_reply_for(groups)
             events = fixed_reply_only(declined_reply) if declined_reply else run_agent(
                 messages, registry, context, required_calls_for(groups, messages), fixed_reply_for(groups)
             )
+            # run_agent reports three kinds of event: words for the customer, "a tool is running", and a finished round of lookups
             async for event in events:
                 if isinstance(event, ToolStarted):
                     # Lets the app show "Checking your account…" while the tool works
