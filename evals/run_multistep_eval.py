@@ -15,7 +15,7 @@ from pathlib import Path
 
 from assistant.clients.embeddings import embed_texts_for_search
 from assistant.services.chat_service import ChatService
-from assistant.services.message_parts import split_message_into_parts
+from assistant.services.part_plans import plan_replies_for_each_part
 from assistant.tools.base import ToolGroup
 from evals.run_answer_eval import REGISTRY, ROUTER, load_cases, route_like_the_app
 from evals.run_tool_eval import build_messages
@@ -38,12 +38,12 @@ def areas_missing_from(route: set[ToolGroup] | None, areas: list[str]) -> list[s
     return [area for area in areas if not (groups_that_cover(area) & route)]
 
 
-# The groups the app would choose for each part of the message, all parts together. A message of one part is routed
-# exactly as before. The parts are routed at the same time.
+# The groups the app would choose for each part of the message, all parts together, taken from the app's own planner
+# (plan_replies_for_each_part), so this exam measures the code the app will run. A message of one part is routed exactly
+# as before. The planner routes the parts one after another.
 async def route_message_by_parts(question: str, search_help) -> set[ToolGroup] | None:
-    parts = split_message_into_parts(question)
-    routes = await asyncio.gather(*(route_like_the_app(build_messages({"question": part}), search_help) for part in parts))
-    groups_of_each_part = [groups for _, groups in routes]
+    plans = await plan_replies_for_each_part(ROUTER, build_messages({"question": question}), REGISTRY, search_help)
+    groups_of_each_part = [plan.groups for plan in plans]
     # A part the router could not route (None) means every tool was offered, so the whole message is unrouted
     if any(groups is None for groups in groups_of_each_part):
         return None
