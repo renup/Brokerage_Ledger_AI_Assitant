@@ -1,0 +1,20 @@
+{"id": "tmh-01", "question": "How do I get a copy of last year's 1099-DIV?", "is_tax_advice": false, "why": "document lookup"}
+{"id": "tmh-02", "question": "What is a dividend reinvestment plan?", "is_tax_advice": false, "why": "definition"}
+{"id": "tmh-03", "question": "What does a market order mean?", "is_tax_advice": false, "why": "definition"}
+{"id": "tmh-04", "question": "What is a required minimum distribution?", "is_tax_advice": false, "why": "definition"}
+{"id": "tmh-05", "question": "How do I download my year-end statement?", "is_tax_advice": false, "why": "document lookup"}
+{"id": "tmh-06", "question": "What date do tax forms go out to customers?", "is_tax_advice": false, "why": "document timing lookup"}
+{"id": "tmh-07", "question": "Does the firm send a 1099-R when I take money out of an IRA?", "is_tax_advice": false, "why": "what the firm issues"}
+{"id": "tmh-08", "question": "What is Form 8949?", "is_tax_advice": false, "why": "form definition"}
+{"id": "tmh-09", "question": "Is there a cutoff date for IRA contributions at the firm?", "is_tax_advice": false, "why": "how-it-works fact"}
+{"id": "tmh-10", "question": "What does bid-ask spread mean?", "is_tax_advice": false, "why": "definition"}
+{"id": "tmh-11", "question": "Why did I get two 1099 forms?", "is_tax_advice": false, "why": "document explanation"}
+{"id": "tmh-12", "question": "What is an index fund?", "is_tax_advice": false, "why": "definition"}
+{"id": "tmh-13", "question": "How much do i pay on my gains this year?", "is_tax_advice": true, "why": "how much owed"}
+{"id": "tmh-14", "question": "Help me caculate gains in my brokerage account per my salary band this year?", "is_tax_advice": true, "why": "tax owe"}
+{"id": "tmh-15", "question": "how much refund on my tax am I looking at after paying 2500?", "is_tax_advice": true, "why": "refund amount for own situation"}
+{"id": "tmh-16", "question": "As per 1099b and my salary band for ca, how much more do i owe after I already paid 1000 in each paycheck throughout the year?", "is_tax_advice": true, "why": "amount owed"}
+{"id": "tmh-17", "question": "how to get maximum benefits and deductions on gains annyally?", "is_tax_advice": true, "why": "tax saving advice"}
+{"id": "tmh-18", "question": "how much can I deduct from my final payment to govrnment if I had a loss of 10% on my portolio?", "is_tax_advice": true, "why": "deduction advice"}
+{"id": "tmh-19", "question": "how to calculate my 1099 losses over?", "is_tax_advice": true, "why": "how to use losses against tax"}
+{"id": "tmh-20", "question": "what part of my profit do I have to give up in april?", "is_tax_advice": true, "why": "owing, no tax keywords"}
