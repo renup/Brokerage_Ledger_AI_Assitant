@@ -1,7 +1,7 @@
 import asyncio
 
 from assistant.replies import REPLY_CANNOT_HELP_WITH_THAT, REPLY_ONLY_THEIR_OWN_ACCOUNT
-from assistant.services.part_plans import plan_replies_for_each_part
+from assistant.services.routed_parts import split_and_route_message
 from assistant.services.tool_router import last_customer_message
 from assistant.tools import ALL_TOOLS
 from assistant.tools.base import ToolGroup
@@ -35,33 +35,33 @@ async def help_search_that_finds_nothing(question):
     return []
 
 
-def plan(router, text, earlier_messages=()):
+def route_parts(router, text, earlier_messages=()):
     messages = [*earlier_messages, {"role": "user", "content": text}]
-    return asyncio.run(plan_replies_for_each_part(router, messages, registry, help_search_that_finds_nothing))
+    return asyncio.run(split_and_route_message(router, messages, registry, help_search_that_finds_nothing))
 
 
-def test_a_message_with_one_request_gets_one_plan_that_the_model_answers():
-    plans = plan(RouterThatRemembersWhatItWasAsked(), "what is my balance")
+def test_a_message_with_one_request_gets_one_routed_part_that_the_model_answers():
+    routed_parts = route_parts(RouterThatRemembersWhatItWasAsked(), "what is my balance")
 
-    assert [p.text for p in plans] == ["what is my balance"]
-    assert plans[0].groups == {ToolGroup.ACCOUNT_DATA}
-    assert plans[0].fixed_sentence is None
+    assert [p.text for p in routed_parts] == ["what is my balance"]
+    assert routed_parts[0].groups == {ToolGroup.ACCOUNT_DATA}
+    assert routed_parts[0].fixed_sentence is None
 
 
 def test_a_tax_advice_part_becomes_a_fixed_decline_even_when_the_router_sent_it_to_a_lookup():
-    plans = plan(RouterThatRemembersWhatItWasAsked(), "what is my balance and do I owe tax on my gain")
+    routed_parts = route_parts(RouterThatRemembersWhatItWasAsked(), "what is my balance and do I owe tax on my gain")
 
-    assert [p.text for p in plans] == ["what is my balance", "do I owe tax on my gain"]
-    assert plans[0].fixed_sentence is None
-    assert plans[1].groups == {ToolGroup.DECLINE_REQUEST}
-    assert plans[1].fixed_sentence == REPLY_CANNOT_HELP_WITH_THAT
+    assert [p.text for p in routed_parts] == ["what is my balance", "do I owe tax on my gain"]
+    assert routed_parts[0].fixed_sentence is None
+    assert routed_parts[1].groups == {ToolGroup.DECLINE_REQUEST}
+    assert routed_parts[1].fixed_sentence == REPLY_CANNOT_HELP_WITH_THAT
 
 
 def test_a_part_about_someone_elses_account_gets_the_fixed_sentence_for_that():
-    plans = plan(RouterThatRemembersWhatItWasAsked(), "what is my balance and send money from my friend's account")
+    routed_parts = route_parts(RouterThatRemembersWhatItWasAsked(), "what is my balance and send money from my friend's account")
 
-    assert plans[0].fixed_sentence is None
-    assert plans[1].fixed_sentence == REPLY_ONLY_THEIR_OWN_ACCOUNT
+    assert routed_parts[0].fixed_sentence is None
+    assert routed_parts[1].fixed_sentence == REPLY_ONLY_THEIR_OWN_ACCOUNT
 
 
 # Each part is routed on its own: the router must see ONE request as the customer's last message, and the earlier
@@ -70,7 +70,7 @@ def test_each_part_is_routed_alone_and_the_earlier_conversation_is_kept():
     router = RouterThatRemembersWhatItWasAsked()
     earlier = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "Hello!"}]
 
-    plan(router, "what is my balance and do I owe tax on my gain", earlier)
+    route_parts(router, "what is my balance and do I owe tax on my gain", earlier)
 
     assert router.last_customer_messages_seen == ["what is my balance", "do I owe tax on my gain"]
     # Two earlier messages plus the part itself, every time: the part replaces the full message, it is not added to it
