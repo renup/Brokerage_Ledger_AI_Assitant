@@ -13,8 +13,7 @@ from assistant.llm import ToolCall, stream_turn, tool_request_message, tool_resu
 from assistant.services.chat_service import ChatService
 from assistant.services.agent import help_search_found_nothing
 from assistant.services.tool_router import (
-    ToolRouter, declined_reply_for, fixed_reply_for, groups_after_decline_check, groups_after_tax_advice_check,
-    groups_with_help_articles, last_customer_message, required_calls_for,
+    ToolRouter, declined_reply_for, fixed_reply_for, required_calls_for, route_customer_message,
 )
 from assistant.tools import ALL_TOOLS
 from assistant.tools.base import ToolContext, ToolGroup
@@ -54,23 +53,8 @@ def numbers_in(text: str) -> set[str]:
 # The routing steps of one chat turn, in the order the app runs them: the router picks the groups, then the code rules
 # adjust them. Returns the tools the model is offered and the groups behind them (None means every tool).
 async def route_like_the_app(messages: list[dict], search_help) -> tuple[ToolRegistry, set[ToolGroup] | None]:
-    registry, groups = await ROUTER.choose_registry_and_groups(messages, REGISTRY)
-    # As in the app: a decline the help center can answer is treated as a help question
-    checked_groups = await groups_after_decline_check(groups, last_customer_message(messages), search_help)
-    if checked_groups != groups:
-        groups = checked_groups
-        registry = REGISTRY.restricted_to(groups)
-    # As in the app: a tax-advice question the router sent to a lookup becomes a decline, after the help check (never rescued)
-    tax_checked_groups = groups_after_tax_advice_check(groups, last_customer_message(messages))
-    if tax_checked_groups != groups:
-        groups = tax_checked_groups
-        registry = REGISTRY.restricted_to(groups)
-    # As in the app: reference questions (fees, tax forms) also search the help articles
-    groups_with_articles = groups_with_help_articles(groups)
-    if groups_with_articles != groups:
-        groups = groups_with_articles
-        registry = REGISTRY.restricted_to(groups)
-    return registry, groups
+    # The app's own routing function, so the exam can never drift from what the app does
+    return await route_customer_message(ROUTER, messages, REGISTRY, search_help)
 
 
 # Mirrors one chat turn: the routing steps, then the required help search, then the model writes the answer.

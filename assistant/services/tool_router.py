@@ -187,3 +187,36 @@ class ToolRouter:
     ) -> tuple[ToolRegistry, set[ToolGroup] | None]:
         groups = await self.choose_tool_groups(messages)
         return (registry if groups is None else registry.restricted_to(groups)), groups
+
+
+# The routing steps of one customer message, in the order they must run: the router picks the groups, then the code rules
+# adjust them. Returns the tools the model is offered and the groups behind them (None means every tool).
+# The app and the exams both call this, so a new rule is added in one place only.
+# "registry" is the full tool menu; every restriction below starts from it, never from an already-restricted one.
+async def route_customer_message(
+        router: ToolRouter, messages: list[dict], registry: ToolRegistry, search_help
+) -> tuple[ToolRegistry, set[ToolGroup] | None]:
+    question = last_customer_message(messages)
+    full_registry = registry
+    registry, groups = await router.choose_registry_and_groups(messages, full_registry)
+
+    # The router may have wrongly declined a real question: if the help center can answer it, treat it as a help question
+    checked_groups = await groups_after_decline_check(groups, question, search_help)
+    if checked_groups != groups:
+        groups = checked_groups
+        registry = full_registry.restricted_to(groups)
+
+    # A tax-advice question the router sent to the tax-form lookup becomes a decline (after the help check on purpose:
+    # a tax-advice question is never rescued as help)
+    tax_checked_groups = groups_after_tax_advice_check(groups, question)
+    if tax_checked_groups != groups:
+        groups = tax_checked_groups
+        registry = full_registry.restricted_to(groups)
+
+    # Reference questions (fees, tax forms) also depend on what the help articles say: search them as well
+    groups_with_articles = groups_with_help_articles(groups)
+    if groups_with_articles != groups:
+        groups = groups_with_articles
+        registry = full_registry.restricted_to(groups)
+
+    return registry, groups

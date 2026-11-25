@@ -17,14 +17,13 @@ from assistant.repositories.messages import MessageRepository
 from assistant.repositories.actions import ActionRepository
 from assistant.repositories.audit import AuditRepository
 from assistant.schemas import ProposalOut
-from assistant.services.agent import ToolRound, ToolStarted, fixed_reply_only, run_agent
+from assistant.services.agent import ToolRound, ToolStarted
 from assistant.services.action_service import ActionService
 from assistant.services.history import trim_to_budget
 from assistant.sse import sse
-from assistant.services.tool_router import (
-    ToolRouter, declined_reply_for, fixed_reply_for, groups_after_decline_check, groups_with_help_articles,
-    last_customer_message, required_calls_for, groups_after_tax_advice_check,
-)
+from assistant.services.tool_router import ToolRouter
+from assistant.services.answer_parts import answer_routed_parts_in_order
+from assistant.services.routed_parts import route_message_as_one_request, split_and_route_message
 from assistant.clients.embeddings import embed_texts_for_search
 from assistant.repositories.help_passages import HelpPassageRepository
 from assistant.services.help_center_service import HelpCenterService
@@ -32,7 +31,6 @@ from assistant.services.passage_judge import keep_only_passages_that_answer
 from assistant.services.answer_guard import AnswerGuard
 
 from assistant.clients.ledger import LedgerClient
-from assistant.services.agent import ToolRound, ToolStarted, run_agent
 from assistant.tools.base import ProposalSaver, ToolContext, HandoffRecorder, HelpSearcher
 from assistant.tools.registry import ToolRegistry
 
@@ -124,34 +122,16 @@ class ChatService:
         # Each round of lookups the agent reports. Saved with the reply so later turns know the real ids.
         rounds = []
         try:
-            # run_agent reports three kinds of event: words for the customer, "a tool is running", and a finished round of lookups
-            # Offer the model only the tools this message needs (falls back to all of them)
-            registry, groups = await self.router.choose_registry_and_groups(messages, self.registry)
-            # The router may have wrongly declined a real question: if the help center can answer it, treat it as a help question
-            checked_groups = await groups_after_decline_check(
-                groups, last_customer_message(messages), self._help_search_function_for_tools([])
-            )
-            if checked_groups != groups:
-                groups = checked_groups
-                registry = self.registry.restricted_to(groups)
-
-            # A tax-advice question the router sent to the tax-form lookup becomes a decline (after the help check on purpose: a tax-advice question is never rescued as help)
-            tax_checked_groups = groups_after_tax_advice_check(groups, last_customer_message(messages))
-            if tax_checked_groups != groups:
-                groups = tax_checked_groups
-                registry = self.registry.restricted_to(groups)
-
-            # Reference questions (fees, tax forms) also depend on what the help articles say: search them as well
-            groups_with_articles = groups_with_help_articles(groups)
-            if groups_with_articles != groups:
-                groups = groups_with_articles
-                registry = self.registry.restricted_to(groups)
-
-            # A request we never help with gets the fixed reply: no lookup and no model call
-            declined_reply = declined_reply_for(groups)
-            events = fixed_reply_only(declined_reply) if declined_reply else run_agent(
-                messages, registry, context, required_calls_for(groups, messages), fixed_reply_for(groups)
-            )
+            help_search = self._help_search_function_for_tools([])
+            # Switched off: the whole message is one request, routed exactly as before splitting existed.
+            # Switched on: cut it into its separate requests and route each (usually there is just one).
+            if settings.split_multi_part_messages:
+                routed_parts = await split_and_route_message(self.router, messages, self.registry, help_search)
+            else:
+                routed_parts = [await route_message_as_one_request(self.router, messages, self.registry, help_search)]
+            # Then answer the parts in order: a request with one part is answered exactly as before (that part's tools, one agent run)
+            events = answer_routed_parts_in_order(routed_parts, messages, self.registry, context)
+            # The events are the same kinds run_agent reports: words for the customer, "a tool is running", and a finished round of lookups
             async for event in events:
                 if isinstance(event, ToolStarted):
                     # Lets the app show "Checking your account…" while the tool works
