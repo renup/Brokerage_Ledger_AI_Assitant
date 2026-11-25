@@ -197,6 +197,9 @@ uv run python web/app.py            # chat page at http://localhost:7860
 Ollama unloads an idle model after 5 minutes, and loading the chat model takes about 8 seconds, longer than the 2-second limit each tool gets. Two settings keep the first question after a quiet spell from failing:
 
 - `MODEL_KEEP_ALIVE` (default `1h`, in `.env`): at start-up the assistant loads the chat and embedding models in the background and asks Ollama to keep them for this long. If Ollama is down it only logs a warning. This applies to that one request.
+
+- `SPLIT_MULTI_PART_MESSAGES` (default `false`, in `.env`): when `true`, a message with several requests is cut into parts and each part is routed and answered in order. Off by default until the splitting exams pass; with it off the whole message is routed as one request.
+
 - `OLLAMA_KEEP_ALIVE` on the Ollama server itself: every later request resets the timer to the server's own default, so set it to the same value. It applies to every model on that Ollama, then restart Ollama. For the menu-bar app: `launchctl setenv OLLAMA_KEEP_ALIVE 1h`, then quit and reopen Ollama. For a terminal: `OLLAMA_KEEP_ALIVE=1h ollama serve`. Use `30m` if memory is tight (the two models take about 7 GB).
 
 - Practice question (`assistant/services/model_readiness.py`): even after a model is loaded, its first real use of the router and judge prompts is slow once (about 4 and 2 seconds). Start-up sends a practice question through both, then writes one practice answer through the chat prompt. Measured with the real app: the router and the help search then take 0.2 and 0.9 seconds on the first question instead of 4.1 and 2.5.

@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     # for it to load. After real requests Ollama uses ITS OWN default (the OLLAMA_KEEP_ALIVE setting), see the README.
     model_keep_alive: str = "1h"
 
+    # Whether a customer message with several requests is cut into parts, each routed and answered on its own (phase 7B).
+    # Off by default: the whole message is routed as ONE request, exactly as before. Turn it on only after the splitting
+    # exams pass (the splitter can still cut a one-request message, such as a rule-override opener plus its ask, in two).
+    split_multi_part_messages: bool = False
+
     # extra="ignore": the shared .env also holds ledger-core's settings (JWT_SECRET etc.).
     # Without this, pydantic would reject them as unknown fields.
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
