@@ -16,12 +16,11 @@ class RoutedPart:
     fixed_sentence: str | None
 
 
-# True when the parts of a message need at least two DIFFERENT real areas (for example account data and a decline).
-# A part with no route (None) or no tools needed (an empty set) does not count as an area. Sentences that all need the
-# same area are usually one request told in several sentences ("My balance looks wrong. What is my cash balance?").
 def parts_need_different_areas(routed_parts: list[RoutedPart]) -> bool:
     areas = {frozenset(part.groups) for part in routed_parts if part.groups}
-    return len(areas) >= 2
+    # An area counts only if no OTHER area contains it: {help} inside {help, reference} is covered, not separate
+    separate_areas = [area for area in areas if not any(area < other for other in areas)]
+    return len(separate_areas) >= 2
 
 # Routes the customer's latest message as ONE request, without cutting it: exactly how the app routed every message before
 # splitting existed. Used when splitting is switched off, and when the parts turn out to be one request told in several sentences.

@@ -1,7 +1,7 @@
 import asyncio
 
 from assistant.replies import REPLY_CANNOT_HELP_WITH_THAT, REPLY_ONLY_THEIR_OWN_ACCOUNT
-from assistant.services.routed_parts import split_and_route_message
+from assistant.services.routed_parts import RoutedPart, parts_need_different_areas, split_and_route_message
 from assistant.services.tool_router import last_customer_message
 from assistant.tools import ALL_TOOLS
 from assistant.tools.base import ToolGroup
@@ -92,14 +92,14 @@ def test_a_long_single_request_keeps_all_of_its_words():
 # request. When the parts do not need different areas, the message is routed as ONE request, exactly as before splitting.
 def test_sentences_that_need_the_same_area_are_routed_as_one_request():
     router = RouterThatRemembersWhatItWasAsked()
-    message = "my balance looks wrong. what is my cash balance"
+    message = "what is my balance. what is my cash balance"
 
     routed_parts = route_parts(router, message)
 
     assert [p.text for p in routed_parts] == [message]
     assert routed_parts[0].groups == {ToolGroup.ACCOUNT_DATA}
     # Each part was routed, then the whole message once
-    assert router.last_customer_messages_seen == ["my balance looks wrong.", "what is my cash balance", message]
+    assert router.last_customer_messages_seen == ["what is my balance.", "what is my cash balance", message]
 
 
 # A jailbreak opener is not a separate request: both sentences are declined, so the whole message is one declined request
@@ -110,3 +110,18 @@ def test_a_jailbreak_opener_and_its_ask_stay_one_declined_request():
 
     assert [p.text for p in routed_parts] == [message]
     assert routed_parts[0].fixed_sentence == REPLY_CANNOT_HELP_WITH_THAT
+
+
+# The app always adds the help articles to a reference route, so a help-only part is already inside it: not a different area
+def test_a_part_whose_route_is_inside_the_other_parts_route_is_not_a_different_area():
+    fees = RoutedPart(text="what is the fee", groups={ToolGroup.REFERENCE, ToolGroup.HELP_CENTER}, fixed_sentence=None)
+    help_only = RoutedPart(text="how much if you do", groups={ToolGroup.HELP_CENTER}, fixed_sentence=None)
+
+    assert not parts_need_different_areas([fees, help_only])
+
+
+def test_account_data_and_help_are_different_areas():
+    account = RoutedPart(text="what is my balance", groups={ToolGroup.ACCOUNT_DATA}, fixed_sentence=None)
+    help_only = RoutedPart(text="how long does a transfer take", groups={ToolGroup.HELP_CENTER}, fixed_sentence=None)
+
+    assert parts_need_different_areas([account, help_only])
