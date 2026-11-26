@@ -34,6 +34,12 @@ def chat(monkeypatch, message, splitting_on):
         yield "Your balance is in the app."
 
     monkeypatch.setattr(llm, "stream_turn", model)
+
+    # The model that judges whether the pieces are separate requests is a stand-in too: it always says "separate"
+    async def judge_says_separate(parts):
+        return True
+
+    monkeypatch.setattr("assistant.services.routed_parts.parts_are_separate_requests", judge_says_separate)
     assistant_app.dependency_overrides[get_current_user] = lambda: MAYA
     assistant_app.dependency_overrides[get_ledger_client] = lambda: FakeLedger()
     assistant_app.dependency_overrides[get_tool_router] = lambda: RouterForTwoPartMessages()
