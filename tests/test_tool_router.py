@@ -142,3 +142,26 @@ def test_other_routes_require_no_lookups(groups):
 def test_a_very_long_message_is_cut_to_the_length_the_search_tool_accepts():
     calls = required_calls_for({ToolGroup.HELP_CENTER}, [{"role": "user", "content": "x" * 1000}])
     assert len(json.loads(calls[0].arguments)["question"]) == 300
+
+
+# The router often adds reference and help to an account question. If the help search is forced first, the model already
+# holds a tool result and answers from the articles without looking up the customer's own data (measured on the live
+# path: 1 of 19 such questions did the lookup). So the search is forced only when the route holds no lookup of the
+# customer's own data; on a mixed route the search stays on the menu as an ordinary tool the model may choose.
+@pytest.mark.parametrize(
+    "groups",
+    [
+        {ToolGroup.ACCOUNT_DATA, ToolGroup.REFERENCE, ToolGroup.HELP_CENTER},
+        {ToolGroup.ACCOUNT_DATA, ToolGroup.HELP_CENTER},
+        {ToolGroup.CHANGES, ToolGroup.HELP_CENTER},
+        {ToolGroup.CHANGES, ToolGroup.REFERENCE, ToolGroup.HELP_CENTER},
+    ],
+)
+def test_a_route_that_looks_up_the_customers_own_data_does_not_force_the_help_search(groups):
+    assert required_calls_for(groups, [{"role": "user", "content": "How much cash do I have?"}]) == []
+
+
+@pytest.mark.parametrize("groups", [{ToolGroup.HELP_CENTER}, {ToolGroup.REFERENCE, ToolGroup.HELP_CENTER}])
+def test_a_route_without_the_customers_own_data_still_forces_the_help_search(groups):
+    calls = required_calls_for(groups, [{"role": "user", "content": "Is there a fee for wire withdrawals?"}])
+    assert [call.name for call in calls] == ["search_help_center"]
