@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator, Callable
+from dataclasses import dataclass
 
 from assistant.services.agent import Token, ToolRound, ToolStarted, fixed_reply_only, run_agent
 from assistant.services.routed_parts import RoutedPart
@@ -8,6 +9,13 @@ from assistant.tools.registry import ToolRegistry
 
 # What goes between the answers to two parts: a blank line
 PART_SEPARATOR = "\n\n"
+
+
+# Reported when a part of the message begins (after the blank line that separates it from the part before). The chat
+# uses it to give every part its own answer checks.
+@dataclass(frozen=True)
+class PartStarted:
+    pass
 
 
 # Answers a customer's parts one after another and streams the events as run_agent does, so the chat can treat a
@@ -21,13 +29,14 @@ async def answer_routed_parts_in_order(
         registry: ToolRegistry,
         context: ToolContext,
         agent: Callable = run_agent,
-) -> AsyncIterator[Token | ToolStarted | ToolRound]:
+) -> AsyncIterator[PartStarted | Token | ToolStarted | ToolRound]:
     earlier_messages = messages[:-1]
     # The parts answered so far, as the customer's words and the reply each got, ready to show the next part
     answered_so_far = []
     for position, part in enumerate(routed_parts):
         if position > 0:
             yield Token(PART_SEPARATOR)
+        yield PartStarted()
         part_messages = [*earlier_messages, *answered_so_far, {"role": "user", "content": part.text}]
         if part.fixed_sentence:
             events = fixed_reply_only(part.fixed_sentence)

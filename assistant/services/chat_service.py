@@ -18,11 +18,11 @@ from assistant.repositories.actions import ActionRepository
 from assistant.repositories.audit import AuditRepository
 from assistant.schemas import ProposalOut
 from assistant.services.agent import ToolRound, ToolStarted
+from assistant.services.answer_parts import PartStarted, answer_routed_parts_in_order
 from assistant.services.action_service import ActionService
 from assistant.services.history import trim_to_budget
 from assistant.sse import sse
 from assistant.services.tool_router import ToolRouter
-from assistant.services.answer_parts import answer_routed_parts_in_order
 from assistant.services.routed_parts import route_message_as_one_request, split_and_route_message
 from assistant.clients.embeddings import embed_texts_for_search
 from assistant.repositories.help_passages import HelpPassageRepository
@@ -136,6 +136,12 @@ class ChatService:
                 if isinstance(event, ToolStarted):
                     # Lets the app show "Checking your account…" while the tool works
                     yield sse("tool", {"name": event.name})
+                elif isinstance(event, PartStarted):
+                    # The part before is finished: check whatever it left unfinished under ITS rules, then start fresh
+                    for safe_text in guard.release_unfinished_sentence():
+                        parts.append(safe_text)
+                        yield sse("token", {"text": safe_text})
+                    guard.start_next_part()
                 elif isinstance(event, ToolRound):
                     # Kept so we can save it with the reply
                     rounds.append(event)

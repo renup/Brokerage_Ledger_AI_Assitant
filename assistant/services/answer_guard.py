@@ -150,6 +150,11 @@ class AnswerGuard:
     def stop_checking_turnarounds_for_this_answer(self) -> None:
         self._check_turnarounds = False
 
+    # Called when the next part of a message begins. An earlier part's ledger lookup backs only that part's answer,
+    # so turnaround times are checked again for this one.
+    def start_next_part(self) -> None:
+        self._check_turnarounds = True
+
     # The first figure or code in the sentence that no trusted source backs, as a reason; None when all are backed
     def _find_unsupported_figure(self, sentence: str) -> str | None:
         for figure in checked_figures_in(sentence, self._check_turnarounds):
