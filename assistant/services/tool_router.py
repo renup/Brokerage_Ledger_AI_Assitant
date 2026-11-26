@@ -97,6 +97,10 @@ def last_customer_message(messages: list[dict]) -> str:
 def required_calls_for(groups: set[ToolGroup] | None, messages: list[dict]) -> list[llm.ToolCall]:
     if not groups or ToolGroup.HELP_CENTER not in groups:
         return []
+    # A route that also looks up the customer's own data does not get the search forced: the model would already hold a
+    # tool result and answer from the articles, skipping the lookup. The search stays on the menu for the model to choose.
+    if groups & {ToolGroup.ACCOUNT_DATA, ToolGroup.CHANGES}:
+        return []
     question = json.dumps({"question": last_customer_message(messages)})
     return [llm.ToolCall(id="required-help-search", name="search_help_center", arguments=question)]
 

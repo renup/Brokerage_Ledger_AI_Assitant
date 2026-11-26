@@ -4,8 +4,12 @@ import json
 import sys
 from pathlib import Path
 
-from assistant.services.agent import Token, run_agent
-from assistant.services.tool_router import ToolRouter, required_calls_for
+from assistant.clients.embeddings import embed_texts_for_search
+from assistant.services.agent import Token, ToolRound
+from assistant.services.answer_parts import answer_routed_parts_in_order
+from assistant.services.chat_service import ChatService
+from assistant.services.routed_parts import route_message_as_one_request
+from assistant.services.tool_router import ToolRouter
 from assistant.tools import ALL_TOOLS
 from assistant.tools.base import ToolContext
 from assistant.tools.registry import ToolRegistry
@@ -24,16 +28,21 @@ def load_cases(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
-# Runs the whole conversation (router, every tool round, final answer) against the demo ledger and returns the answer
-# and the names of the tools used, in order.
-async def answer_end_to_end(question: str) -> tuple[str, list[str]]:
+# Runs the whole conversation the way the app does, using the app's own functions so this exam cannot drift from it:
+# routing, the forced help search where the route says so, every tool round and the final answer. Only the ledger is
+# the demo one. Returns the answer and the names of the tools used, in order.
+async def answer_end_to_end(question: str, search_help) -> tuple[str, list[str]]:
     messages = build_messages({"question": question})
-    registry, groups = await ROUTER.choose_registry_and_groups(messages, REGISTRY)
+    # One request, routed with all the code rules (decline, tax advice, help articles)
+    routed_parts = [await route_message_as_one_request(ROUTER, messages, REGISTRY, search_help)]
+    # What the tools may use: the demo ledger and the real help search
+    context = ToolContext(DemoLedger(), search_help=search_help)
     words, tools_used = [], []
-    async for event in run_agent(messages, registry, ToolContext(DemoLedger()), required_calls_for(groups, messages)):
+    async for event in answer_routed_parts_in_order(routed_parts, messages, REGISTRY, context):
         if isinstance(event, Token):
             words.append(event.text)
-        elif hasattr(event, "records"):
+        elif isinstance(event, ToolRound):
+            # A finished round of lookups: remember which tools ran
             tools_used += [record.name for record in event.records]
     return "".join(words), tools_used
 
@@ -46,11 +55,15 @@ def find_problems(case: dict, answer: str) -> list[str]:
 
 
 async def run(cases: list[dict], runs: int) -> list[dict]:
+    # The app's own help search (real articles and judge), built once for all cases
+    search_help = ChatService(None, None, REGISTRY, ROUTER)._help_search_function_for_tools([])
+    # Loads the embedding model first, so the first case does not time out
+    await embed_texts_for_search(["warm up"])
     results = []
     for case in cases:
         attempts = []
         for _ in range(runs):
-            answer, tools_used = await answer_end_to_end(case["question"])
+            answer, tools_used = await answer_end_to_end(case["question"], search_help)
             attempts.append({"tools": tools_used, "answer": answer, "problems": find_problems(case, answer)})
         passed = sum(not a["problems"] for a in attempts)
         label = "PASS " if passed == runs else "FAIL " if passed == 0 else "FLAKY"
