@@ -165,3 +165,35 @@ def test_a_route_that_looks_up_the_customers_own_data_does_not_force_the_help_se
 def test_a_route_without_the_customers_own_data_still_forces_the_help_search(groups):
     calls = required_calls_for(groups, [{"role": "user", "content": "Is there a fee for wire withdrawals?"}])
     assert [call.name for call in calls] == ["search_help_center"]
+
+
+# The customer's own tax forms are in the ledger. A forced article search made the model repeat the article and skip the
+# lookup, so on a reference route it is not forced for these.
+@pytest.mark.parametrize("question", [
+    "Which tax documents do I have on file?",
+    "Is my 2026 1099 ready yet?",
+    "Where is my 5498?",
+    "Are my tax forms available?",
+])
+def test_a_question_about_the_customers_own_tax_forms_does_not_force_the_help_search(question):
+    messages = [{"role": "user", "content": question}]
+    assert required_calls_for({ToolGroup.REFERENCE, ToolGroup.HELP_CENTER}, messages) == []
+
+
+# General tax-form questions, and fee questions that say "my", are still answered from the articles
+@pytest.mark.parametrize("question", [
+    "When are 5498 forms ready?",
+    "What is a 1099-B?",
+    "How much fees do I pay on my taxable account?",
+    "Is my account charged a fee? And when are tax forms ready?",
+])
+def test_a_general_tax_or_fee_question_still_forces_the_help_search(question):
+    calls = required_calls_for({ToolGroup.REFERENCE, ToolGroup.HELP_CENTER}, [{"role": "user", "content": question}])
+    assert [call.name for call in calls] == ["search_help_center"]
+
+
+# A help-only route has no tax-document lookup on its menu. Skipping the search there would leave the model with nothing
+# to answer from, so the search stays forced.
+def test_a_help_only_route_forces_the_search_even_for_the_customers_own_tax_forms():
+    calls = required_calls_for({ToolGroup.HELP_CENTER}, [{"role": "user", "content": "Why is my 1099 late?"}])
+    assert [call.name for call in calls] == ["search_help_center"]

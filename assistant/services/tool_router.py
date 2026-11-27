@@ -35,6 +35,27 @@ ROUTES_THAT_ALSO_NEED_THE_HELP_ARTICLES = {ToolGroup.REFERENCE}
 # Words that put a question about tax. "government" is included because customers ask "what do I pay the government".
 TAX_WORDS = re.compile(r"\b(?:tax|taxes|taxed|taxable|irs|government)\b", re.IGNORECASE)
 
+# "Taxable account" is the name of an account type. It is taken out before looking for tax words, so a fee question
+# about that account is not mistaken for a tax question.
+TAXABLE_ACCOUNT_NAME = re.compile(r"\btaxable(?:\s+(?:brokerage|individual))?\s+accounts?\b", re.IGNORECASE)
+
+# Words for money an investment makes, or for selling it. Paying "on" these in a taxable account is a tax question
+# even when the word "tax" is not used.
+EARNINGS_WORDS = re.compile(
+    r"\b(?:gains?|dividends?|earnings|profits?|sell|selling|sold)\b", re.IGNORECASE  # \b matches whole words only
+)
+
+# The names a customer uses for their tax forms
+TAX_FORM_NAMES = r"\b(?:1099|5498|tax (?:forms?|documents?))\b"
+
+# A question about the customer's OWN tax forms: "my ... 1099", "tax forms ... my", or "which tax documents do I have".
+# The [^.?!]{0,30} part allows up to 30 characters between the two, within one sentence.
+OWN_TAX_FORMS = re.compile(
+    rf"\bmy\b[^.?!]{{0,30}}{TAX_FORM_NAMES}"                # "my 2026 1099"
+    rf"|{TAX_FORM_NAMES}[^.?!]{{0,30}}\b(?:my|do i have)\b",  # "tax forms for my accounts", "documents do I have"
+    re.IGNORECASE,
+)
+
 # Words that turn a tax question into a request for advice: what the customer owes, can deduct, or can save.
 # A tax question without one of these ("when will my tax documents be ready?", "what is tax-advantaged?") is not advice.
 OWING_OR_SAVING_WORDS = re.compile(
@@ -101,6 +122,10 @@ def required_calls_for(groups: set[ToolGroup] | None, messages: list[dict]) -> l
     # tool result and answer from the articles, skipping the lookup. The search stays on the menu for the model to choose.
     if groups & {ToolGroup.ACCOUNT_DATA, ToolGroup.CHANGES}:
         return []
+    # The customer's own tax forms are in the ledger, not in the articles. With no forced search the model looks them up.
+    # Only on a reference route, because that is the route that offers the tax-document lookup.
+    if ToolGroup.REFERENCE in groups and OWN_TAX_FORMS.search(last_customer_message(messages)):
+        return []
     question = json.dumps({"question": last_customer_message(messages)})
     return [llm.ToolCall(id="required-help-search", name="search_help_center", arguments=question)]
 
@@ -117,8 +142,15 @@ def declined_reply_for(groups: set[ToolGroup] | None) -> str | None:
 # True when the customer asks what they owe, can deduct or can save in tax. Wording rules only, so a new way of asking can
 # slip past; the answer guard (find_tax_liability_claim) is the net behind it.
 def question_asks_for_tax_advice(question: str) -> bool:
+    # The question with the account type's name replaced: only the other words can make it a tax question
+    wording_without_account_name = TAXABLE_ACCOUNT_NAME.sub("account", question)
+    # True when something was replaced, meaning the customer named a taxable account
+    names_a_taxable_account = wording_without_account_name != question
     return bool(
-        (TAX_WORDS.search(question) and OWING_OR_SAVING_WORDS.search(question))
+        # A tax word of its own, plus owing or saving
+        (TAX_WORDS.search(wording_without_account_name) and OWING_OR_SAVING_WORDS.search(question))
+        # No tax word needed: a taxable account, plus paying, plus earnings or a sale
+        or (names_a_taxable_account and OWING_OR_SAVING_WORDS.search(question) and EARNINGS_WORDS.search(question))
         or LIABLE_FOR_A_GAIN.search(question)
         or WRITING_OFF_A_LOSS.search(question)
         or ASKING_TO_DEDUCT.search(question)

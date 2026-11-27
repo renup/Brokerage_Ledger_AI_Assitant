@@ -254,6 +254,10 @@ def test_a_question_about_what_the_customer_owes_or_can_deduct_is_tax_advice(que
     "What does tax-advantaged mean for an IRA?",
     "Does the firm report my sales to the IRS?",
     "What is the withdrawal fee?",
+    # "Taxable account" is the name of an account type, not a question about tax
+    "How much fees do I pay on my taxable account?",
+    "Do taxable accounts pay an annual fee?",
+    "What do I pay for paper statements on my taxable brokerage account?",
 ])
 def test_tax_forms_and_definitions_are_not_tax_advice(question):
     assert not question_asks_for_tax_advice(question)
@@ -277,3 +281,17 @@ def test_a_change_request_or_third_party_request_is_never_turned_into_a_decline(
     question = "Cancel my withdrawal, and do I owe tax on it?"
     assert groups_after_tax_advice_check({ToolGroup.CHANGES}, question) == {ToolGroup.CHANGES}
     assert groups_after_tax_advice_check({ToolGroup.THIRD_PARTY_REQUEST}, question) == {ToolGroup.THIRD_PARTY_REQUEST}
+
+
+# Naming the account type must not hide a real tax question asked in the same sentence
+@pytest.mark.parametrize("question", [
+    "Do I owe tax on the gains in my taxable account?",
+    "Is the interest taxable, and how much will I pay?",
+    "How can I lower the taxes on my taxable account?",
+    # No other tax word, but paying on what an investment earns, or on selling it, is a tax question
+    "What will I pay on the gains in my taxable account?",
+    "How much will I pay on dividends in my taxable account?",
+    "What do I pay if I sell shares in my taxable account?",
+])
+def test_a_tax_question_that_names_a_taxable_account_is_still_tax_advice(question):
+    assert question_asks_for_tax_advice(question)
