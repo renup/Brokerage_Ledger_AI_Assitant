@@ -2,3 +2,13 @@
 {"id": "out-02", "question": "how much cash is in my Roth IRA?", "must_state": [["900"]]}
 {"id": "out-03", "question": "where is my withdrawal?", "must_state": [["chase"], ["day 2"], ["pending"]]}
 {"id": "out-04", "question": "can I take out 5000 from my Roth IRA", "must_state": [["cannot", "can't", "not", "unable"]], "must_not_state": [["you can withdraw $5000", "yes, you can"]]}
+{"id": "out-05", "question": "Which tax documents do I have on file?", "must_state": [["1099-B"], ["1099-DIV"], ["5498"]]}
+{"id": "out-06", "question": "Is my 2026 1099 ready yet?", "must_state": [["2027"]]}
+{"id": "out-07", "question": "When are 5498 forms ready?", "must_state": [["in may", "may 31", "by may"]], "must_not_state": [["april"]]}
+{"id": "out-08", "question": "How much fees do I pay on my taxable account?", "must_state": [["75"]], "must_not_state": [["can't give investment"]]}
+{"id": "out-09", "question": "How do I download my tax forms?", "must_state": [["download"], ["tax documents list", "documents list", "app", "dashboard"]]}
+{"id": "out-10", "question": "Are all my tax documents available yet?", "must_state": [["pending", "not yet", "not available"], ["2027"]]}
+{"id": "out-11", "question": "Where is my 5498?", "must_state": [["available", "download"]], "must_not_state": [["pending", "not yet"]]}
+{"id": "out-12", "question": "Show me the tax forms for my accounts", "must_state": [["1099-B"], ["1099-DIV"], ["5498"]]}
+{"id": "out-13", "question": "What is a 1099-B?", "must_state": [["sales", "sale", "sold", "selling"]]}
+{"id": "out-14", "question": "Has my 1099-DIV been issued?", "must_state": [["available", "yes", "has been issued"]], "must_not_state": [["pending", "not yet"]]}

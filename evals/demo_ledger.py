@@ -34,7 +34,30 @@ class DemoLedger:
         return []
 
     async def fees(self):
-        return []
+        # (name, dollars, how often, which account type it applies to), for this customer's two accounts
+        rows = [
+            ("Stock and ETF trades", 0.0, "per_trade", "all"),
+            ("Outgoing account transfer", 75.0, "per_transfer_out", "all"),
+            ("Outgoing wire withdrawal", 25.0, "per_withdrawal", "all"),
+            ("Paper statements", 2.0, "monthly", "all"),
+            ("IRA annual fee", 25.0, "annual", "roth_ira"),
+        ]
+        return [
+            {"name": name, "amount": amount, "frequency": frequency, "applies_to": applies_to}
+            for name, amount, frequency, applies_to in rows
+        ]
 
     async def tax_documents(self, year=None):
-        return []
+        # (account type, last 4 digits, form, tax year, status, date it is available)
+        rows = [
+            ("individual", "1111", "1099-B", 2025, "available", "2026-02-15"),
+            ("individual", "1111", "1099-DIV", 2025, "available", "2026-02-15"),
+            ("roth_ira", "2222", "5498", 2025, "available", "2026-05-31"),
+            ("individual", "1111", "1099-B", 2026, "pending", "2027-02-15"),
+        ]
+        return [
+            {"account_type": kind, "number_last4": last4, "form": form, "tax_year": tax_year,
+             "status": status, "available_on": available_on}
+            for kind, last4, form, tax_year, status, available_on in rows
+            if year is None or year == tax_year
+        ]
